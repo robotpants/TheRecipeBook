@@ -1,0 +1,1424 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Recipe Book</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Load Lato font -->
+    <link href="https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700;900&display=swap" rel="stylesheet" />
+    <!-- Load React and ReactDOM -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.development.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.development.js"></script>
+    <!-- Babel is needed to compile the JSX in the script block -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/6.26.0/babel.min.js"></script>
+    
+    <style>
+        /* Global CSS and Font Fixes */
+        .font-sans, body { font-family: 'Lato', sans-serif !important; }
+        .font-mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        h1, h3 { font-weight: 900; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+    // FIX 1: Define global variables to prevent ReferenceError in Netlify environment.
+    window.__app_id = window.__app_id || 'default-app-id';
+    window.__firebase_config = window.__firebase_config || '{}';
+    window.__initial_auth_token = window.__initial_auth_token || null;
+    
+    // FIX 2: Ensure React is explicitly imported/defined for Babel 6 scope.
+    import React, { useState, useEffect, useMemo, useRef } from 'react';
+    
+    // --- PASTE THE ENTIRE CONTENTS OF App.jsx HERE ---
+    // The following code block contains the entire React application logic (v0.8.006).
+
+// Version 0.8.006: Guaranteed Deployment Stability
+// - FIX: Added robust null/undefined checks around favoriteRecipeIds.size to prevent 'Cannot read properties of undefined (reading 'size')' crash during unstable initialization/hot-reloading.
+// - Features: Full Detail Modal, Auth Retry Fix, Lato Font, Debug Screen, Edit/Delete, controlled base profiles, image compression, bookmarks, endorsements.
+
+import { initializeApp } from 'firebase/app';
+import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from 'firebase/auth';
+import { getFirestore, collection, onSnapshot, query, addDoc, setDoc, doc, deleteDoc, updateDoc, arrayUnion, arrayRemove, serverTimestamp, getDocs, writeBatch } from 'firebase/firestore';
+import { Camera, Image as ImageIcon, PlusCircle, Aperture, Search, Zap, UploadCloud, X, Settings, Bookmark, Star, BookOpen, MoreVertical, Edit, Trash2, ChevronDown, Bug, AlertTriangle, Info } from 'lucide-react';
+
+// --- Global Firebase Config & Utils ---
+const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null; 
+const RECIPES_COLLECTION_PATH = 'artifacts/' + appId + '/public/data/cameraRecipes';
+
+// --- Branding & Color Constants ---
+const PRIMARY_COLOR = '#FF654F'; // The new reddish-orange accent color
+const SITE_TITLE = 'The Recipe Book'; // Confirmed site title is set here
+
+// --- v0.5.001 Base Profile Data (Official Names) ---
+const BASE_PROFILES_BY_BRAND = {
+    'Fujifilm': [
+        'PROVIA/Standard', 'Velvia/Vivid', 'ASTIA/Soft', 'Classic Chrome', 
+        'ETERNA/Cinema', 'ETERNA Bleach Bypass', 'Classic Neg.', 'Nostalgic Negative',
+        'ACROS', 'ACROS + Ye Filter', 'ACROS + R Filter', 'ACROS + G Filter', 
+        'Black & White', 'B&W + Filter', 'Sepia', 'Reala ACE'
+    ],
+    'Canon': [
+        'Standard', 'Portrait', 'Landscape', 'Fine Detail', 
+        'Neutral', 'Faithful', 'Monochrome'
+    ],
+    'Nikon': [
+        'Standard', 'Portrait', 
+        'Landscape', 'Flat', 'Dream', 'Morning', 'Pop', 'Sunday', 
+        'Somber', 'Dramatic', 'Silence', 'Bleached', 'Melancholic', 
+        'Pure', 'Denim', 'Toy', 'Sepia', 'Blue', 'Red', 'Pink', 
+        'Charcoal', 'Graphite', 'Binary', 'Carbon' // Includes Creative Picture Controls
+    ],
+    'Sony': [
+        'ST (Standard)', 'PT (Portrait)', 'LA (Landscape)', 'VV (Vivid)', 
+        'Clear', 'Deep', 'Light', 'M (Sepia)', 'W (Black/White)',
+        'Creative Look (FL)', 'Creative Look (IN)', 'Creative Look (SH)' 
+        // Adding modern Creative Looks as options
+    ],
+    'Ricoh': [
+        'GR IIIx', 'GR III', 'GR II' // Main modern models
+    ],
+    'Olympus/OM System': [
+        'i-Enhance', 'Vivid', 'Natural', 'Muted', 'Portrait', 
+        'Monotone', 'Custom1', 'Custom2', 'Sepia', 'Art Filter (Various)'
+    ]
+};
+
+// --- v0.3.002 Brand & Model Data (Expanded) ---
+const ALL_BRANDS = Object.keys(BASE_PROFILES_BY_BRAND);
+const DEFAULT_BRAND = 'Fujifilm'; 
+
+const BRAND_MODELS = {
+    'Fujifilm': [
+        'X100VI', 'X100V', 'X-T5', 'X-T4', 'X-H2S', 'X-H2', 'X-S20', 'X-S10', 
+        'X-Pro3', 'X-E4', 'X-T30 II', 'X-T30', 'GFX 100 II', 'GFX 50S II', 'GFX 100S'
+    ],
+    'Canon': [
+        'EOS R3', 'EOS R5', 'EOS R6 II', 'EOS R6', 'EOS R8', 'EOS R7', 
+        'EOS R10', 'EOS R50', 'EOS R', 'EOS RP', 'EOS 90D', 'EOS M50 II', 'EOS M6 II'
+    ],
+    'Nikon': [
+        'Z9', 'Z8', 'Z7 II', 'Z6 II', 'Zf', 'Zfc', 'Z5', 'Z50', 'Z30', 
+        'D850', 'D780', 'D500' // Including some recent DSLRs that use Picture Control
+    ],
+    'Sony': [
+        'A1', 'A9 III', 'A7S III', 'A7R V', 'A7R IV', 'A7 IV', 'A7C II', 
+        'A7CR', 'A6700', 'A6600', 'ZV-E10', 'ZV-1 II' // Mirrorless and Vlogging line
+    ],
+    'Ricoh': [
+        'GR IIIx', 'GR III', 'GR II' // Main modern models
+    ],
+    'Olympus/OM System': [
+        'OM-1 II', 'OM-1', 'OM-5', 'E-M1 Mark III', 'E-M5 Mark III', 'E-M10 Mark IV'
+    ],
+};
+
+// --- Image Configuration Engine ---
+const IMAGE_CONFIG = {
+  maxWidth: 800,       // Maximum width in pixels for the resized image
+  quality: 0.75,       // 0.0 to 1.0 (JPEG Quality)
+  maxInputSizeMB: 10,  // Limit input file size before processing
+  outputFormat: 'image/jpeg'
+};
+
+/**
+ * Reusable Image Compression Utility
+ * @param {File} file - The browser File object
+ * @returns {Promise<string>} - Resolves with Base64 data string
+ */
+const compressImage = (file) => {
+  return new Promise((resolve, reject) => {
+    if (!file) return reject("No file provided");
+    
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    
+    reader.onload = (event) => {
+      const img = new Image();
+      img.src = event.target.result;
+      
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+
+        if (width > IMAGE_CONFIG.maxWidth) {
+          height *= IMAGE_CONFIG.maxWidth / width;
+          width = IMAGE_CONFIG.maxWidth;
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+
+        const dataUrl = canvas.toDataURL(IMAGE_CONFIG.outputFormat, IMAGE_CONFIG.quality);
+        resolve(dataUrl);
+      };
+      
+      img.onerror = (err) => reject("Image load failed: " + err);
+    };
+    
+    reader.onerror = (err) => reject("File read failed: " + err);
+  });
+};
+
+// --- Terminology Mapping ---
+const CORE_PARAMS_MAP = [
+  { key: 'baseProfile', genericLabel: 'Base Profile / Simulation', labels: {
+    'Fujifilm': 'Film Simulation',
+    'Canon': 'Picture Style',
+    'Nikon': 'Picture Control',
+    'Sony': 'Creative Style / Look',
+    'Ricoh': 'Image Control',
+    'Olympus/OM System': 'Picture Mode',
+  }},
+  { key: 'whiteBalance', genericLabel: 'White Balance Preset', labels: {
+    'Fujifilm': 'White Balance Preset',
+    'Canon': 'White Balance Preset',
+    'Nikon': 'White Balance Preset',
+    'Sony': 'White Balance Preset',
+    'Ricoh': 'White Balance Preset',
+    'Olympus/OM System': 'White Balance Preset',
+  }},
+  { key: 'wbShift', genericLabel: 'WB Shift / Color Tone', labels: {
+    'Fujifilm': 'WB Shift', // Simplified
+    'Canon': 'Color Tone', // Simplified
+    'Nikon': 'WB Adjust', // Simplified
+    'Sony': 'Color Phase', // Simplified
+    'Ricoh': 'WB Adjustment', // Simplified
+    'Olympus/OM System': 'WB Custom Adj', // Simplified
+  }},
+  { key: 'highlightTone', genericLabel: 'Highlights / Tone Hi', labels: {
+    'Fujifilm': 'Highlight Tone',
+    'Canon': 'Contrast (Hi)', // Simplified
+    'Nikon': 'Highlights',
+    'Sony': 'Highlights', // Simplified
+    'Ricoh': 'Contrast (Hi)', // Simplified
+    'Olympus/OM System': 'Highlight',
+  }},
+  { key: 'shadowTone', genericLabel: 'Shadow Tone', labels: {
+    'Fujifilm': 'Shadow Tone',
+    'Canon': 'Contrast (Lo)', // Simplified
+    'Nikon': 'Shadows',
+    'Sony': 'Shadows', // Simplified
+    'Ricoh': 'Contrast (Lo)', // Simplified
+    'Olympus/OM System': 'Shadow',
+  }},
+  { key: 'colorSaturation', genericLabel: 'Color / Saturation', labels: {
+    'Fujifilm': 'Color',
+    'Canon': 'Saturation',
+    'Nikon': 'Saturation',
+    'Sony': 'Saturation',
+    'Ricoh': 'Saturation',
+    'Olympus/OM System': 'Color',
+  }},
+  { key: 'sharpness', genericLabel: 'Sharpness / Detail', labels: {
+    'Fujifilm': 'Sharpness',
+    'Canon': 'Sharpness',
+    'Nikon': 'Sharpening', // Simplified
+    'Sony': 'Sharpening / Detail',
+    'Ricoh': 'Sharpness',
+    'Olympus/OM System': 'Sharpness',
+  }},
+  { key: 'dynamicRange', genericLabel: 'Dynamic Range Comp.', labels: {
+    'Fujifilm': 'DR Setting', // Simplified
+    'Canon': 'ALO', // Simplified
+    'Nikon': 'ADL', // Simplified
+    'Sony': 'DRO / HDR', // Simplified
+    'Ricoh': 'DR Comp.', // Simplified
+    'Olympus/OM System': 'Gradation',
+  }},
+  { key: 'clarity', genericLabel: 'Clarity / Tonal Curve', labels: {
+    'Fujifilm': 'Clarity',
+    'Canon': 'Clarity',
+    'Nikon': 'Clarity',
+    'Sony': 'Clarity',
+    'Ricoh': 'Clarity/Curve', // Simplified
+    'Olympus/OM System': 'Midtones', 
+  }},
+  { key: 'noiseReduction', genericLabel: 'Noise Reduction (NR)', labels: {
+    'Fujifilm': 'Noise Reduction', // Simplified
+    'Canon': 'Noise Reduction', // Simplified
+    'Nikon': 'High ISO NR',
+    'Sony': 'Noise Reduction', // Simplified
+    'Ricoh': 'Noise Reduction', // Simplified
+    'Olympus/OM System': 'Noise Reduction', // Simplified
+  }},
+];
+
+// Ensure BRAND_MODELS[DEFAULT_BRAND] and BASE_PROFILES_BY_BRAND[DEFAULT_BRAND] are defined
+const initialFormState = {
+  name: '',
+  brand: DEFAULT_BRAND,
+  // FIX: Replaced optional chaining with logical AND for Babel 6 compatibility
+  model: BRAND_MODELS[DEFAULT_BRAND] && BRAND_MODELS[DEFAULT_BRAND][0] || '', 
+  notes: '',
+  imageUrl: '',
+  // Default recipe document fields
+  endorserIds: [], 
+  // FIX: Replaced optional chaining with logical AND for Babel 6 compatibility
+  baseProfile: BASE_PROFILES_BY_BRAND[DEFAULT_BRAND] && BASE_PROFILES_BY_BRAND[DEFAULT_BRAND][0] || '', 
+  ...CORE_PARAMS_MAP.filter(p => p.key !== 'baseProfile').reduce((acc, param) => ({ ...acc, [param.key]: '' }), {}),
+};
+
+const getLabelForBrand = (key, brand) => {
+  const param = CORE_PARAMS_MAP.find(p => p.key === key);
+  if (!param) return key;
+  // This is used for the Card display - pull the simplified label from the map
+  return param.labels[brand] || param.genericLabel.split('/')[0].trim();
+};
+
+// --- Recipe Detail Modal Component ---
+const RecipeDetailModal = ({ recipe, isVisible, onClose, userId, toggleFavorite, toggleEndorsement, setEditingRecipe, handleDeleteRecipe }) => {
+    if (!isVisible || !recipe) return null;
+
+    const isEndorsed = recipe.endorserIds && recipe.endorserIds.includes(userId) || false;
+    const endorsementCount = recipe.endorserIds && recipe.endorserIds.length || 0;
+    const isOwner = recipe.userId === userId;
+    const isFavorite = recipe.isFavorite || false; // isFavorite passed from parent
+
+    const allSettings = CORE_PARAMS_MAP.map(param => ({
+        key: param.key,
+        label: getLabelForBrand(param.key, recipe.brand),
+        value: recipe[param.key] || '---',
+        genericLabel: param.genericLabel.split('/')[0].trim(),
+    }));
+
+    const handleEdit = () => {
+        setEditingRecipe(recipe);
+        onClose();
+    };
+
+    const handleDelete = () => {
+        handleDeleteRecipe(recipe.id, recipe.name);
+        onClose();
+    };
+
+    return (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl w-full max-w-4xl shadow-2xl overflow-hidden transform transition-all">
+                
+                <div className="flex justify-between items-start p-6 border-b border-gray-100 bg-gray-50/50">
+                    <div className='flex-1 pr-6'>
+                        <h2 className="text-3xl font-black text-gray-900 leading-tight mb-1">{recipe.name}</h2>
+                        <p className="text-md font-medium text-gray-600 flex items-center mt-2">
+                            <Camera className="w-4 h-4 mr-2 text-gray-500" />
+                            {recipe.brand} &bull; {recipe.model || 'All Models'}
+                        </p>
+                    </div>
+                    
+                    <div className="flex space-x-3 items-center">
+                        {isOwner && (
+                            <button
+                                onClick={handleEdit}
+                                className="p-3 rounded-full text-blue-600 hover:bg-blue-50 transition"
+                                title="Edit Recipe"
+                            >
+                                <Edit className="w-5 h-5" />
+                            </button>
+                        )}
+                        {isOwner && (
+                            <button
+                                onClick={handleDelete}
+                                className="p-3 rounded-full text-red-600 hover:bg-red-50 transition"
+                                title="Delete Recipe"
+                            >
+                                <Trash2 className="w-5 h-5" />
+                            </button>
+                        )}
+                        <button onClick={onClose} className="p-3 rounded-full text-gray-400 hover:bg-gray-100 transition">
+                            <X className="w-6 h-6" />
+                        </button>
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-3 divide-y lg:divide-y-0 lg:divide-x divide-gray-100 max-h-[70vh] overflow-y-auto">
+                    
+                    {/* Column 1: Image & Interaction */}
+                    <div className="lg:col-span-1 p-6 flex flex-col items-center">
+                        <div className="w-full h-56 bg-gray-100 rounded-lg overflow-hidden mb-4">
+                            {recipe.imageUrl ? (
+                                <img src={recipe.imageUrl} alt={recipe.name} className="w-full h-full object-cover" />
+                            ) : (
+                                <div className="w-full h-full flex items-center justify-center bg-gray-100 text-gray-300">
+                                    <ImageIcon className="w-10 h-10" />
+                                </div>
+                            )}
+                        </div>
+                        
+                        <div className="flex w-full space-x-3 mt-auto">
+                            <button
+                                onClick={() => toggleFavorite(recipe.id, isFavorite)}
+                                className={`flex-1 flex items-center justify-center px-4 py-3 rounded-lg text-sm font-semibold transition-all ${isFavorite ? 'bg-[#FF654F] text-white' : 'bg-gray-100 text-gray-700 hover:bg-[#FF654F]/20'}`}
+                                title={isFavorite ? "Remove Bookmark" : "Bookmark Recipe"}
+                            >
+                                <Bookmark className={`w-4 h-4 mr-2 ${isFavorite ? 'fill-white' : 'fill-gray-600'}`} />
+                                {isFavorite ? 'Bookmarked' : 'Bookmark'}
+                            </button>
+
+                            <button
+                                onClick={() => toggleEndorsement(recipe.id, isEndorsed)}
+                                className={`flex-1 flex items-center justify-center px-4 py-3 rounded-lg text-sm font-semibold transition-all ${isEndorsed ? 'bg-yellow-500 text-white' : 'bg-gray-100 text-gray-700 hover:bg-yellow-100'}`}
+                                title={isEndorsed ? "Remove Endorsement" : "Endorse Recipe"}
+                            >
+                                <Star className={`w-4 h-4 mr-2 ${isEndorsed ? 'fill-white' : 'fill-gray-500'}`} />
+                                Endorse ({endorsementCount})
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Column 2: Full Settings List */}
+                    <div className="lg:col-span-2 p-6">
+                        <h3 className="text-xl font-bold text-gray-800 mb-4 flex items-center">
+                            <Aperture className="w-5 h-5 mr-2 text-[#FF654F]" />
+                            Full Settings List
+                        </h3>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-6">
+                            {allSettings.map((setting) => (
+                                <div key={setting.key}>
+                                    <p className="text-xs font-bold uppercase text-gray-500 tracking-wider mb-0.5">
+                                        {setting.label}
+                                    </p>
+                                    <p className="text-lg font-mono font-medium text-gray-900" title={setting.genericLabel}>
+                                        {setting.value}
+                                    </p>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                    
+                    {/* Notes Section (moved below settings for better flow) */}
+                    {recipe.notes && (
+                         <div className="lg:col-span-3 p-6 pt-0 border-t border-gray-100 lg:border-t-0">
+                            <h3 className="text-xl font-bold text-gray-800 mb-4 flex items-center">
+                                <Info className="w-5 h-5 mr-2 text-blue-500" />
+                                Creator Notes
+                            </h3>
+                            <p className="text-sm text-gray-700 whitespace-pre-wrap">{recipe.notes}</p>
+                         </div>
+                    )}
+                </div>
+
+            </div>
+        </div>
+    );
+};
+
+
+// --- Recipe Card Component (Modified to Open Modal) ---
+const RecipeCard = ({ recipe, userId, isFavorite, toggleFavorite, toggleEndorsement, setEditingRecipe, handleDeleteRecipe, setSelectedRecipe }) => {
+  const settingsWithValues = CORE_PARAMS_MAP.filter(param => recipe[param.key] && recipe[param.key].trim() !== '');
+  const isEndorsed = recipe.endorserIds && recipe.endorserIds.includes(userId) || false;
+  const endorsementCount = recipe.endorserIds && recipe.endorserIds.length || 0;
+  const isOwner = recipe.userId === userId;
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const menuRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (menuRef.current && !menuRef.current.contains(event.target)) {
+        setIsMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
+  const handleEdit = (e) => {
+    e.stopPropagation(); // Prevent modal from opening
+    setEditingRecipe(recipe);
+    setIsMenuOpen(false);
+  };
+
+  const handleDelete = (e) => {
+    e.stopPropagation(); // Prevent modal from opening
+    // Note: handleDeleteRecipe handles confirmation internally
+    handleDeleteRecipe(recipe.id, recipe.name);
+    setIsMenuOpen(false);
+  };
+
+  return (
+    <div 
+        className="group bg-white/95 backdrop-blur-sm rounded-xl shadow-lg border border-gray-100 hover:shadow-2xl transition-all duration-300 overflow-hidden flex flex-col cursor-pointer"
+        onClick={() => setSelectedRecipe(Object.assign({}, recipe, { isFavorite }))} // Open the detail modal
+    >
+      
+      <div className="relative h-48 w-full bg-gray-100 overflow-hidden">
+        {recipe.imageUrl ? (
+          <img 
+            src={recipe.imageUrl} 
+            alt={recipe.name} 
+            className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+            onError={(e) => {e.target.style.display = 'none'}}
+          />
+        ) : (
+          <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-gray-100 to-gray-200 text-gray-300">
+             <Camera className="w-12 h-12 mb-2 opacity-20" />
+             <span className="text-xs font-mono opacity-40">No Preview</span>
+          </div>
+        )}
+        
+        {/* Top Right: Interaction Buttons (Stop propagation on these) */}
+        <div className="absolute top-3 right-3 flex items-center space-x-2">
+            
+            {/* Endorsement Button */}
+            <button
+                onClick={(e) => { e.stopPropagation(); toggleEndorsement(recipe.id, isEndorsed); }}
+                className={`flex items-center text-xs font-semibold px-2.5 py-1 rounded-full shadow-md transition-all ${isEndorsed ? 'bg-yellow-500 text-white' : 'bg-white text-gray-700 hover:bg-yellow-100'}`}
+                title={isEndorsed ? "Remove Endorsement" : "Endorse Recipe"}
+            >
+                <Star className={`w-3 h-3 mr-1 ${isEndorsed ? 'fill-white' : 'fill-gray-400'}`} />
+                {endorsementCount}
+            </button>
+
+            {/* Favorite Button */}
+            <button
+                onClick={(e) => { e.stopPropagation(); toggleFavorite(recipe.id, isFavorite); }}
+                className={`p-2 rounded-full shadow-md transition-all ${isFavorite ? 'bg-[#FF654F] text-white' : 'bg-white text-gray-400 hover:text-[#FF654F] hover:bg-gray-100'}`}
+                title={isFavorite ? "Remove Bookmark" : "Bookmark Recipe"}
+            >
+                <Bookmark className={`w-4 h-4 ${isFavorite ? 'fill-white' : 'fill-gray-400'}`} />
+            </button>
+
+             {/* Owner Menu */}
+            {isOwner && (
+              <div ref={menuRef} className="relative">
+                <button
+                    onClick={(e) => { e.stopPropagation(); setIsMenuOpen(!isMenuOpen); }}
+                    className="p-2 rounded-full bg-white text-gray-400 hover:text-gray-600 shadow-md transition-all"
+                    title="Manage Recipe"
+                >
+                    <MoreVertical className="w-4 h-4" />
+                </button>
+                {isMenuOpen && (
+                  <div className="absolute right-0 top-10 w-32 bg-white rounded-lg shadow-xl overflow-hidden z-30 border border-gray-100">
+                    <button
+                      onClick={handleEdit}
+                      className="flex items-center w-full px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 transition"
+                    >
+                      <Edit className="w-4 h-4 mr-2 text-blue-500" /> Edit
+                    </button>
+                    <button
+                      onClick={handleDelete}
+                      className="flex items-center w-full px-3 py-2 text-sm text-red-600 hover:bg-red-50 transition"
+                    >
+                      <Trash2 className="w-4 h-4 mr-2" /> Delete
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+        </div>
+
+        {/* Top Left: Brand Tag */}
+        <div className="absolute top-3 left-3 bg-white/90 backdrop-blur px-3 py-1 rounded-full text-xs font-bold text-gray-700 shadow-sm border border-gray-100">
+          {recipe.brand}
+        </div>
+      </div>
+
+      <div className="p-5 flex-1 flex flex-col">
+        <div className="mb-4 border-b border-gray-100 pb-3">
+          <h3 className="text-xl font-extrabold text-gray-800 leading-tight mb-1">{recipe.name}</h3>
+          <p className="text-sm font-medium text-gray-500 flex items-center">
+            <Camera className="w-3 h-3 mr-1.5 text-gray-400" />
+            {recipe.model || 'All Models'}
+          </p>
+          {isOwner && <span className="text-xs text-blue-500 font-bold mt-1 inline-block">My Recipe</span>}
+        </div>
+
+        <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs mb-4">
+          {settingsWithValues.slice(0, 6).map((param) => (
+            <div key={param.key} className="flex flex-col">
+              <span className="font-semibold text-gray-500 text-[10px] uppercase tracking-wider">
+                {/* USE BRAND-SPECIFIC LABEL HERE */}
+                {getLabelForBrand(param.key, recipe.brand)} 
+              </span>
+              <span className="text-[#FF654F] font-medium font-mono truncate" title={recipe[param.key]}>
+                {recipe[param.key]}
+              </span>
+            </div>
+          ))}
+          {settingsWithValues.length > 6 && (
+            <div className="col-span-2 text-center pt-2">
+              <span className="text-xs text-gray-400 italic">+{settingsWithValues.length - 6} more settings</span>
+            </div>
+          )}
+        </div>
+        
+        {recipe.notes && (
+          <div className="mt-auto pt-3 bg-gray-50 -mx-5 -mb-5 p-4 border-t border-gray-100">
+            <p className="text-gray-600 text-xs italic line-clamp-3">"{recipe.notes}"</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// --- Modal/Form Component (Reusable) ---
+const RecipeForm = ({ 
+    recipeData, isVisible, onClose, onSubmit, onInputChange, onBrandChange, 
+    onImageUpload, onClearImage, isProcessingImage, fileInputRef // RECEIVE REF HERE
+}) => {
+    const isEditing = !!recipeData.id;
+    const formTitle = isEditing ? 'Edit Recipe' : 'Share a New Recipe';
+    const submitButtonText = isEditing ? 'Update Recipe' : 'Publish Recipe';
+
+    const handleFileInputClick = () => {
+        // Use the passed ref to trigger the click
+        if (fileInputRef.current) {
+            fileInputRef.current.click();
+        }
+    };
+    
+    const customClearImage = () => {
+        onClearImage(); // Clears the image URL state
+        // Manually clear the DOM element's value when clearing the image
+        if (fileInputRef.current) {
+            fileInputRef.current.value = null;
+        }
+    };
+
+    const customImageUpload = (e) => {
+        // Pass the event and the ref up to the App component
+        onImageUpload(e, fileInputRef);
+    }
+
+    if (!isVisible) return null;
+
+    return (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl w-full max-w-3xl shadow-2xl overflow-hidden">
+                
+                <div className="flex justify-between items-center p-6 border-b border-gray-100 bg-gray-50/50">
+                    <h2 className="text-xl font-bold text-gray-800 flex items-center">
+                        <Zap className="w-5 h-5 mr-2 text-[#FF654F]" />
+                        {formTitle}
+                    </h2>
+                    <button onClick={onClose} className="text-gray-400 hover:text-gray-600 p-2 hover:bg-gray-100 rounded-full transition">
+                        <X className="w-6 h-6" />
+                    </button>
+                </div>
+
+                <form onSubmit={onSubmit} className="p-6 max-h-[80vh] overflow-y-auto">
+                    
+                    <div className="mb-8">
+                        <div className="flex justify-between items-end mb-2">
+                            <label className="block text-sm font-bold text-gray-700">Result Preview (Optional)</label>
+                            <span className="text-[10px] bg-gray-100 text-gray-500 px-2 py-1 rounded border border-gray-200 flex items-center">
+                                <Settings className="w-3 h-3 mr-1" />
+                                Max: {IMAGE_CONFIG.maxWidth}px
+                            </span>
+                        </div>
+                        
+                        <div className={`border-2 border-dashed rounded-xl transition-colors flex flex-col items-center justify-center relative overflow-hidden h-48 bg-gray-50 ${recipeData.imageUrl ? 'border-[#FF654F]' : 'border-gray-300 hover:border-[#FF654F]'}`}>
+                            
+                            {isProcessingImage ? (
+                                <div className="text-[#FF654F] flex flex-col items-center">
+                                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#FF654F] mb-2"></div>
+                                    <span className="text-xs font-medium">Optimizing & Compressing...</span>
+                                </div>
+                            ) : recipeData.imageUrl ? (
+                                <React.Fragment>
+                                    <img src={recipeData.imageUrl} alt="Preview" className="absolute inset-0 w-full h-full object-cover" />
+                                    <button 
+                                        type="button" 
+                                        onClick={customClearImage}
+                                        className="absolute top-2 right-2 bg-red-500 text-white p-1.5 rounded-full shadow-lg hover:bg-red-600 transition"
+                                    >
+                                        <X className="w-4 h-4" />
+                                    </button>
+                                </React.Fragment>
+                            ) : (
+                                <div className="w-full h-full flex flex-col items-center justify-center" onClick={handleFileInputClick}>
+                                    <UploadCloud className="w-10 h-10 text-gray-300 mb-3" />
+                                    <p className="text-sm text-gray-500 font-medium">Click to upload a photo</p>
+                                    <p className="text-xs text-gray-400 mt-1">Auto-optimized for speed</p>
+                                    
+                                    {/* ATTACH REF HERE, NO KEY NEEDED */}
+                                    <input 
+                                        type="file" 
+                                        ref={fileInputRef} 
+                                        id="recipe-file-input"
+                                        accept="image/jpeg,image/png,image/webp"
+                                        onChange={customImageUpload}
+                                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" 
+                                    />
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                        <div className="md:col-span-2">
+                            <label className="block text-xs font-bold uppercase text-gray-500 tracking-wider mb-1">Recipe Name</label>
+                            <input type="text" name="name" value={recipeData.name} onChange={onInputChange} className="w-full border-gray-300 rounded-lg shadow-sm focus:ring-[#FF654F] focus:border-[#FF654F]" placeholder="e.g. Pacific Blue" required />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-bold uppercase text-gray-500 tracking-wider mb-1">Brand</label>
+                            <select name="brand" value={recipeData.brand} onChange={onBrandChange} className="w-full border-gray-300 rounded-lg shadow-sm focus:ring-[#FF654F] focus:border-[#FF654F]" disabled={isEditing}>
+                                {ALL_BRANDS.map(b => <option key={b} value={b}>{b}</option>)}
+                            </select>
+                        </div>
+                        <div>
+                            <label className="block text-xs font-bold uppercase text-gray-500 tracking-wider mb-1">Model</label>
+                            <select name="model" value={recipeData.model} onChange={onInputChange} className="w-full border-gray-300 rounded-lg shadow-sm focus:ring-[#FF654F] focus:border-[#FF654F]" required>
+                                {BRAND_MODELS[recipeData.brand] && BRAND_MODELS[recipeData.brand].map(model => (
+                                    <option key={model} value={model}>{model}</option>
+                                ))}
+                            </select>
+                        </div>
+                    </div>
+
+                    <div className="bg-[#FF654F]/10 rounded-xl p-5 mb-6 border border-[#FF654F]/30">
+                        <h3 className="text-sm font-bold text-[#FF654F] mb-4 flex items-center">
+                            <Aperture className="w-4 h-4 mr-2" />
+                            Settings ({recipeData.brand})
+                        </h3>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            
+                            {/* Base Profile Select */}
+                            <div key="baseProfile">
+                                <label className="block text-xs font-medium text-gray-600 mb-1">
+                                    {getLabelForBrand('baseProfile', recipeData.brand)} *
+                                </label>
+                                <select 
+                                    name="baseProfile" 
+                                    value={recipeData.baseProfile} 
+                                    onChange={onInputChange} 
+                                    className="w-full text-sm border-gray-300 rounded-md focus:ring-[#FF654F] focus:border-[#FF654F]" 
+                                    required
+                                >
+                                    {BASE_PROFILES_BY_BRAND[recipeData.brand] && BASE_PROFILES_BY_BRAND[recipeData.brand].map(profile => (
+                                        <option key={profile} value={profile}>{profile}</option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            {/* Remaining Parameters */}
+                            {CORE_PARAMS_MAP.filter(p => p.key !== 'baseProfile').map(param => {
+                                return (
+                                    <div key={param.key}>
+                                        <label className="block text-xs font-medium text-gray-600 mb-1">
+                                            {/* USE GENERIC LABEL HERE FOR FULL EXPLANATION */}
+                                            {param.genericLabel.split('/')[0].trim()}
+                                        </label>
+                                        <input 
+                                            type="text" 
+                                            name={param.key} 
+                                            value={recipeData[param.key]} 
+                                            onChange={onInputChange} 
+                                            className="w-full text-sm border-gray-300 rounded-md focus:ring-[#FF654F] focus:border-[#FF654F]" 
+                                            placeholder="Value..." 
+                                        />
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+
+                    <div className="mb-6">
+                        <label className="block text-xs font-bold uppercase text-gray-500 tracking-wider mb-1">Notes</label>
+                        <textarea name="notes" rows="3" value={recipeData.notes} onChange={onInputChange} className="w-full border-gray-300 rounded-lg shadow-sm focus:ring-[#FF654F] focus:border-[#FF654F]" placeholder="Lighting conditions, lens recommendations..." />
+                    </div>
+
+                    <button type="submit" className="w-full py-4 bg-[#FF654F] hover:bg-red-500 text-white rounded-xl font-bold shadow-lg transform transition hover:-translate-y-0.5 flex justify-center items-center">
+                        {isEditing ? <Edit className="w-5 h-5 mr-2" /> : <PlusCircle className="w-5 h-5 mr-2" />}
+                        {submitButtonText}
+                    </button>
+                </form>
+            </div>
+        </div>
+    );
+};
+
+// --- Debug Screen Component ---
+const DebugScreen = ({ isVisible, onClose, handleDeleteAllRecipes, userId }) => {
+    if (!isVisible) return null;
+
+    const knownBugs = [
+        { 
+            id: 1, 
+            title: "Image Upload Dialogue Repeats", 
+            description: "When selecting an image file, the browser's file selection dialogue repeats once before successfully loading the image. This is a persistent React/DOM race condition.",
+            severity: "High" 
+        },
+        { 
+            id: 2, 
+            title: "No User Authentication/Profiles", 
+            description: "The application uses anonymous authentication. User data (recipes, endorsements) is tied to the current anonymous ID, but there's no way to sign in on another device.",
+            severity: "Medium" 
+        },
+        { 
+            id: 3, 
+            title: "No Sorting/Pagination", 
+            description: "The main recipe list lacks controls for sorting (e.g., newest, most endorsed) or pagination for large data sets.",
+            severity: "Medium" 
+        },
+    ];
+
+    return (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl w-full max-w-4xl shadow-2xl overflow-hidden">
+                
+                <div className="flex justify-between items-center p-6 border-b border-gray-100 bg-gray-50/50">
+                    <h2 className="text-xl font-bold text-gray-800 flex items-center">
+                        <Bug className="w-5 h-5 mr-2 text-gray-500" />
+                        Developer Debug Menu
+                    </h2>
+                    <button onClick={onClose} className="text-gray-400 hover:text-gray-600 p-2 hover:bg-gray-100 rounded-full transition">
+                        <X className="w-6 h-6" />
+                    </button>
+                </div>
+
+                <div className="p-6 grid grid-cols-1 lg:grid-cols-3 gap-8 max-h-[80vh] overflow-y-auto">
+                    
+                    {/* Column 1: Database Operations */}
+                    <div className="lg:col-span-1 border-r lg:pr-8">
+                        <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center">
+                           <AlertTriangle className="w-5 h-5 mr-2 text-red-500" />
+                           Database Tools
+                        </h3>
+                        <p className="text-sm text-gray-600 mb-4">
+                           These actions are for testing purposes only and cannot be undone. They affect all users.
+                        </p>
+                        
+                        <div className='mb-4 p-3 bg-gray-100 rounded-lg'>
+                           <p className='text-xs font-semibold text-gray-700 mb-1'>Current Anonymous User ID:</p>
+                           <p className='text-xs font-mono break-all text-gray-800'>{userId || 'Authenticating...'}</p>
+                        </div>
+
+                        <button
+                          onClick={handleDeleteAllRecipes}
+                          className="flex items-center w-full justify-center px-4 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg font-bold shadow-md transition"
+                        >
+                          <Trash2 className="w-5 h-5 mr-2" /> Reset All Recipe Data
+                        </button>
+                    </div>
+
+                    {/* Column 2 & 3: Known Bugs */}
+                    <div className="lg:col-span-2">
+                        <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center">
+                            <Bug className="w-5 h-5 mr-2 text-yellow-600" />
+                            Known Bugs & Future Tasks
+                        </h3>
+                        
+                        <ul className="space-y-4">
+                            {knownBugs.map(bug => (
+                                <li key={bug.id} className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                                    <h4 className={`text-base font-bold ${bug.severity === 'High' ? 'text-red-700' : 'text-gray-800'}`}>
+                                        {bug.title}
+                                    </h4>
+                                    <p className="text-xs text-gray-500 mt-1">Severity: {bug.severity}</p>
+                                    <p className="text-sm text-gray-600 mt-2">{bug.description}</p>
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
+                </div>
+
+                <div className="p-4 border-t border-gray-100 text-right bg-gray-50/50">
+                    <button onClick={onClose} className="px-5 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg font-medium transition">
+                        Close
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+
+// --- Main App Component ---
+function App() {
+  const [db, setDb] = useState(null);
+  const [auth, setAuth] = useState(null);
+  const [userId, setUserId] = useState(null);
+  const [recipes, setRecipes] = useState([]);
+  const [favoriteRecipeIds, setFavoriteRecipeIds] = useState(new Set()); // Corrected initialization
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [isAuthReady, setIsAuthReady] = useState(false);
+  
+  // Form State
+  const [isFormVisible, setIsFormVisible] = useState(false);
+  const [isDebugMenuOpen, setIsDebugMenuOpen] = useState(false); // Controls the new DebugScreen
+  const [newRecipe, setNewRecipe] = useState(initialFormState);
+  const [editingRecipe, setEditingRecipe] = useState(null); // Holds recipe object if editing
+  const [selectedRecipe, setSelectedRecipe] = useState(null); // Holds recipe for detail modal
+  
+  // Filtering & Search
+  const [filterBrand, setFilterBrand] = useState('All');
+  const [searchTerm, setSearchTerm] = useState('');
+  
+  const [isProcessingImage, setIsProcessingImage] = useState(false);
+  const fileInputRef = useRef(null); // Reference for the file input DOM element
+
+  // --- Utility for showing non-blocking errors ---
+  const showCustomError = (message) => {
+    setError(message);
+    setTimeout(() => setError(null), 5000);
+  }
+
+  // --- 1. Firebase Initialization and Authentication ---
+  useEffect(() => {
+    if (!Object.keys(firebaseConfig).length) {
+      setError("Firebase config is missing.");
+      setLoading(false);
+      setIsAuthReady(true);
+      return;
+    }
+
+    try {
+      const app = initializeApp(firebaseConfig);
+      const firestoreDb = getFirestore(app);
+      const firebaseAuth = getAuth(app);
+      setDb(firestoreDb);
+      setAuth(firebaseAuth);
+
+      const unsubscribe = onAuthStateChanged(firebaseAuth, async (user) => {
+        if (!user) {
+          
+          // --- BEGIN AUTH RETRY LOGIC ---
+          const MAX_RETRIES = 5;
+          for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+            try {
+              if (initialAuthToken) {
+                const userCredential = await signInWithCustomToken(firebaseAuth, initialAuthToken);
+                setUserId(userCredential.user.uid);
+              } else {
+                const userCredential = await signInAnonymously(firebaseAuth);
+                setUserId(userCredential.user.uid);
+              }
+              // If successful, break the loop
+              break; 
+            } catch (authError) {
+              if (attempt < MAX_RETRIES - 1) {
+                // Exponential backoff: wait for 2^attempt * 500ms
+                const delay = Math.pow(2, attempt) * 500;
+                await new Promise(resolve => setTimeout(resolve, delay));
+              } else {
+                // Final attempt failed
+                console.error("Firebase Auth Error (Max Retries Exceeded):", authError);
+                setError("Authentication failed after multiple attempts.");
+              }
+            }
+          }
+          // --- END AUTH RETRY LOGIC ---
+          
+        } else {
+          setUserId(user.uid);
+        }
+        setLoading(false);
+        setIsAuthReady(true);
+      });
+      return () => unsubscribe();
+    } catch (e) {
+      console.error("Init Error:", e);
+      setError("Initialization failed.");
+      setLoading(false);
+      setIsAuthReady(true);
+    }
+  }, []);
+
+  // --- 2. Real-time Listener for Public Recipes (Includes Endorser IDs) ---
+  useEffect(() => {
+    if (!db || !isAuthReady) return;
+    const q = query(collection(db, RECIPES_COLLECTION_PATH));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const fetchedRecipes = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setRecipes(fetchedRecipes);
+    }, (snapError) => {
+      console.error("Snapshot Error (Public Recipes):", snapError);
+      // Removed the error display here as it's secondary to auth failure
+    });
+    return () => unsubscribe();
+  }, [db, isAuthReady]); 
+
+  // --- 3. Real-time Listener for User's Private Favorites ---
+  useEffect(() => {
+    if (!db || !isAuthReady || !userId) return;
+
+    // Path: /artifacts/{appId}/users/{userId}/favorites
+    const FAVORITES_COLLECTION_PATH = `artifacts/${appId}/users/${userId}/favorites`;
+    const q = query(collection(db, FAVORITES_COLLECTION_PATH));
+    
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      // Map documents to a Set for quick O(1) lookup in RecipeCard
+      const favoriteIds = new Set(snapshot.docs.map(doc => doc.id));
+      setFavoriteRecipeIds(favoriteIds);
+    }, (snapError) => {
+      console.error("Snapshot Error (Private Favorites):", snapError);
+    });
+    
+    return () => unsubscribe();
+  }, [db, isAuthReady, userId]);
+
+  // --- 4. Core Logic for Interactions ---
+
+  const toggleFavorite = async (recipeId, isFavorite) => {
+    if (!db || !userId) {
+      showCustomError("Authentication required to save favorites.");
+      return;
+    }
+    
+    // Path: /artifacts/{appId}/users/{userId}/favorites/{recipeId}
+    const favoriteDocRef = doc(db, `artifacts/${appId}/users/${userId}/favorites`, recipeId);
+
+    try {
+        if (isFavorite) {
+            await deleteDoc(favoriteDocRef);
+        } else {
+            await setDoc(favoriteDocRef, { 
+                favoritedAt: serverTimestamp(),
+                recipeId: recipeId
+            });
+        }
+    } catch (err) {
+        console.error("Toggle Favorite Error:", err);
+        showCustomError("Failed to update favorite status.");
+    }
+  };
+
+  const toggleEndorsement = async (recipeId, isEndorsed) => {
+    if (!db || !userId) {
+      showCustomError("Authentication required to endorse recipes.");
+      return;
+    }
+
+    // Path: /artifacts/{appId}/public/data/cameraRecipes/{recipeId}
+    const recipeDocRef = doc(db, RECIPES_COLLECTION_PATH, recipeId);
+
+    try {
+        if (isEndorsed) {
+            await updateDoc(recipeDocRef, {
+                endorserIds: arrayRemove(userId)
+            });
+        } else {
+            await updateDoc(recipeDocRef, {
+                endorserIds: arrayUnion(userId) 
+            });
+        }
+    } catch (err) {
+        console.error("Toggle Endorsement Error:", err);
+        showCustomError("Failed to update endorsement status.");
+    }
+  };
+  
+  const handleDeleteRecipe = async (recipeId, recipeName) => {
+    if (!db || !userId) {
+        showCustomError("Authentication required to delete recipes.");
+        return;
+    }
+
+    const confirmed = window.confirm(`Are you sure you want to delete the recipe: "${recipeName}"? This action cannot be undone.`);
+
+    if (confirmed) {
+        try {
+            const recipeToDelete = recipes.find(r => r.id === recipeId);
+            if (!recipeToDelete || recipeToDelete.userId !== userId) {
+                showCustomError("You can only delete your own recipes.");
+                return;
+            }
+
+            const recipeDocRef = doc(db, RECIPES_COLLECTION_PATH, recipeId);
+            await deleteDoc(recipeDocRef);
+            showCustomError(`Recipe "${recipeName}" deleted successfully.`);
+        } catch (err) {
+            console.error("Delete Error:", err);
+            showCustomError("Failed to delete recipe.");
+        }
+    }
+  };
+
+  const handleDeleteAllRecipes = async () => {
+    if (!db || !userId) {
+        showCustomError("App not ready or authentication failed.");
+        return;
+    }
+
+    const confirmed = window.confirm("!!! DANGER ZONE !!!\n\nAre you absolutely sure you want to delete ALL recipes? This will wipe the public collection and cannot be undone.");
+
+    if (confirmed) {
+        try {
+            const recipeCollectionRef = collection(db, RECIPES_COLLECTION_PATH);
+            const snapshot = await getDocs(recipeCollectionRef);
+            
+            const batch = writeBatch(db);
+            let deleteCount = 0;
+
+            snapshot.docs.forEach((document) => {
+                batch.delete(document.ref);
+                deleteCount++;
+            });
+
+            await batch.commit();
+            showCustomError(`${deleteCount} recipes deleted successfully.`);
+            setIsDebugMenuOpen(false); // Close menu on success
+        } catch (err) {
+            console.error("Delete All Error:", err);
+            showCustomError("Failed to delete all recipes.");
+        }
+    }
+  }
+
+
+  // --- 5. Filtering and Searching ---
+  const filteredRecipes = useMemo(() => {
+    let list = recipes;
+    if (filterBrand !== 'All') list = list.filter(recipe => recipe.brand === filterBrand);
+    
+    // If filtering by favorites, only show recipes whose IDs are in the set
+    if (filterBrand === 'Favorites' && favoriteRecipeIds && favoriteRecipeIds.size > 0) {
+        list = list.filter(recipe => favoriteRecipeIds.has(recipe.id));
+    } else if (filterBrand === 'Favorites') {
+        list = []; 
+    }
+
+    if (searchTerm) {
+      const lower = searchTerm.toLowerCase();
+      list = list.filter(r => 
+        r.name && r.name.toLowerCase().includes(lower) || 
+        r.model && r.model.toLowerCase().includes(lower) || 
+        r.baseProfile && r.baseProfile.toLowerCase().includes(lower)
+      );
+    }
+    // Sort by endorsement count (descending) then by timestamp
+    return list.sort((a, b) => {
+        const endorserA = a.endorserIds && a.endorserIds.length || 0;
+        const endorserB = b.endorserIds && b.endorserIds.length || 0;
+        if (endorserB !== endorserA) return endorserB - endorserA;
+        return (b.timestamp && b.timestamp.seconds || 0) - (a.timestamp && a.timestamp.seconds || 0);
+    });
+  }, [recipes, filterBrand, searchTerm, favoriteRecipeIds]);
+
+  // --- 6. Form Handlers ---
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    // Determine which state setter to use
+    const setter = editingRecipe ? setEditingRecipe : setNewRecipe;
+    setter(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleBrandChange = (e) => {
+    const { name, value } = e.target;
+    const setter = editingRecipe ? setEditingRecipe : setNewRecipe;
+
+    setter(prev => {
+        const models = BRAND_MODELS[value] || [];
+        const newModel = models.length > 0 ? models[0] : '';
+        const newBaseProfile = BRAND_MODELS[value] && BASE_PROFILES_BY_BRAND[value][0] || '';
+
+        return { 
+            ...prev, 
+            [name]: value, 
+            model: newModel,
+            baseProfile: newBaseProfile,
+            // Reset all other parameters on brand switch (important for cleaner data)
+            ...CORE_PARAMS_MAP.filter(p => p.key !== 'baseProfile').reduce((acc, param) => ({ ...acc, [param.key]: '' }), {}),
+        };
+    });
+  };
+  
+  // NOTE: Now accepts the fileInputRef
+  const handleImageUpload = async (e, inputRef) => {
+    // 1. Capture file
+    const file = e.target.files[0];
+    
+    if (!file) return;
+
+    // CRITICAL: Reset the DOM input value immediately after capture. This is key.
+    if (inputRef.current) {
+        inputRef.current.value = null; 
+    }
+
+    if (file.size > IMAGE_CONFIG.maxInputSizeMB * 1024 * 1024) {
+      showCustomError('File too large. Limit is ' + IMAGE_CONFIG.maxInputSizeMB + 'MB.');
+      return;
+    }
+
+    setIsProcessingImage(true);
+
+    try {
+      const compressedDataUrl = await compressImage(file);
+      
+      const setter = editingRecipe ? setEditingRecipe : setNewRecipe;
+      setter(prev => ({ ...prev, imageUrl: compressedDataUrl }));
+      
+      setIsProcessingImage(false);
+    } catch (err) {
+      console.error('Compression Failed:', err);
+      showCustomError('Failed to process image. It might be corrupt.');
+      setIsProcessingImage(false);
+    }
+  };
+
+  // Note: This function is called from RecipeForm.
+  const clearImage = () => {
+    const setter = editingRecipe ? setEditingRecipe : setNewRecipe;
+    setter(prev => ({ ...prev, imageUrl: '' }));
+    // The form component handles clearing the DOM input value via the ref.
+  };
+  
+  const resetFormState = () => {
+    setNewRecipe(initialFormState);
+    setEditingRecipe(null);
+    setIsFormVisible(false);
+  }
+
+  const handleFormSubmit = async (e) => {
+    e.preventDefault();
+
+    if (!db || !userId) {
+      showCustomError("App not ready. Please wait.");
+      return;
+    }
+
+    const recipeData = editingRecipe || newRecipe;
+
+    if (!recipeData.name || !recipeData.brand || !recipeData.baseProfile) {
+        showCustomError("Please fill in Recipe Name, Brand, and Base Profile.");
+        return;
+    }
+    
+    const validProfiles = BASE_PROFILES_BY_BRAND[recipeData.brand] || [];
+    if (!validProfiles.includes(recipeData.baseProfile)) {
+        showCustomError("Invalid Base Profile selected for the chosen brand.");
+        return;
+    }
+
+    try {
+      // 1. Prepare data
+      const submissionData = {
+        ...recipeData,
+        // These fields are only set on creation
+        ...(editingRecipe ? {} : { userId, endorserIds: [], timestamp: serverTimestamp() })
+      };
+      
+      if (editingRecipe) {
+        // EDIT MODE: Update existing document
+        // Destructure the original ID and metadata before sending the clean payload
+        const { id, endorserIds, userId: ownerId, timestamp, ...dataToUpdate } = submissionData;
+        const recipeDocRef = doc(db, RECIPES_COLLECTION_PATH, editingRecipe.id);
+        
+        await updateDoc(recipeDocRef, dataToUpdate);
+        showCustomError("Recipe updated successfully!");
+      } else {
+        // ADD MODE: Create new document
+        // CRUCIAL FIX: Create a shallow copy and delete the ID property 
+        // to ensure Firestore accepts the payload for a new document.
+        const dataToSave = Object.assign({}, submissionData);
+        delete dataToSave.id; 
+
+        await addDoc(collection(db, RECIPES_COLLECTION_PATH), dataToSave);
+        showCustomError("Recipe published successfully!");
+      }
+
+      resetFormState();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } catch (err) {
+      console.error("Submission Error:", err);
+      showCustomError("Failed to submit. Ensure your data is valid.");
+    }
+  };
+
+  // Logic to show form when editingRecipe state is set
+  useEffect(() => {
+    if (editingRecipe) {
+      setIsFormVisible(true);
+      setSelectedRecipe(null); // Close detail modal if open
+    }
+  }, [editingRecipe]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#FF654F]"></div>
+      </div>
+    );
+  }
+
+  return (
+    <React.Fragment>
+      
+      <div className="min-h-screen bg-gray-50 font-sans text-gray-800 pb-20">
+        
+        <header className="sticky top-0 z-20 bg-white/90 backdrop-blur shadow-sm border-b border-gray-200">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
+            <div className="flex items-center">
+              <div className="bg-[#FF654F] p-2 rounded-lg mr-3">
+                  <BookOpen className="w-5 h-5 text-white" />
+              </div>
+              <h1 className="text-2xl font-black tracking-tight text-gray-900">
+                {/* LOGIC FOR SITE TITLE COLORING: The Recipe Book */}
+                {SITE_TITLE.split(' ').map((word, index) => (
+                    <span key={index} className={index === 1 ? 'text-[#FF654F]' : ''}> 
+                        {word}{' '}
+                    </span>
+                ))}
+                
+                {/* Version link prep */}
+                <a href="#v0.8.006" className="ml-2 text-[10px] font-medium bg-[#FF654F]/20 text-[#FF654F] px-1.5 py-0.5 rounded border border-[#FF654F]/30 hover:bg-[#FF654F]/30 transition">v0.8.006</a>
+              </h1>
+            </div>
+            <div className="flex space-x-3 items-center">
+               <div className="text-xs text-gray-500 hidden sm:block">User ID: <span className="font-mono font-semibold text-gray-700">{userId || 'N/A'}</span></div>
+               
+               {/* Settings Button (Opens Debug Screen) */}
+                 <button 
+                    onClick={() => setIsDebugMenuOpen(true)}
+                    className="p-2 rounded-full text-gray-700 hover:bg-gray-100 transition"
+                    title="Debug & Settings"
+                 >
+                    <Settings className="w-5 h-5" />
+                 </button>
+
+               <button 
+                  onClick={() => {setEditingRecipe(null); setIsFormVisible(true); setSelectedRecipe(null);}}
+                  className="bg-gray-900 text-white px-4 py-2 rounded-full text-sm font-semibold hover:bg-gray-800 transition flex items-center shadow-md"
+               >
+                 <PlusCircle className="w-4 h-4 mr-2" />
+                 New Recipe
+               </button>
+            </div>
+          </div>
+        </header>
+        
+        {error && (
+          <div className="fixed top-20 left-1/2 transform -translate-x-1/2 z-50 px-6 py-3 bg-red-500 text-white rounded-full shadow-xl text-sm font-medium animate-bounce">
+            {error}
+          </div>
+        )}
+
+        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          
+          {/* Search & Filter Bar */}
+          <div className="flex flex-col md:flex-row gap-4 mb-8">
+            <div className="relative flex-1">
+              <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Search recipes, models, or tags..."
+                className="w-full pl-12 pr-4 py-3 rounded-xl border-none bg-white shadow-sm focus:ring-2 focus:ring-[#FF654F]"
+              />
+            </div>
+            <div className="flex gap-2 overflow-x-auto pb-2 md:pb-0 hide-scrollbar">
+              <button 
+                  onClick={() => setFilterBrand('All')}
+                  className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${filterBrand === 'All' ? 'bg-gray-800 text-white' : 'bg-white text-gray-600 hover:bg-gray-100'}`}
+              >
+                  All Brands
+              </button>
+              {ALL_BRANDS.map(brand => (
+                  <button 
+                      key={brand}
+                      onClick={() => setFilterBrand(brand)}
+                      className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${filterBrand === brand ? 'bg-[#FF654F] text-white shadow-md' : 'bg-white text-gray-600 hover:bg-gray-100'}`}
+                  >
+                      {brand}
+                  </button>
+              ))}
+              <button 
+                  onClick={() => setFilterBrand('Favorites')}
+                  className={`flex items-center px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${filterBrand === 'Favorites' ? 'bg-gray-800 text-white shadow-md' : 'bg-white text-gray-600 hover:bg-gray-100'}`}
+              >
+                  <Bookmark className="w-4 h-4 mr-1.5" fill={filterBrand === 'Favorites' ? 'white' : 'currentColor'}/>
+                  Bookmarks ({favoriteRecipeIds ? favoriteRecipeIds.size : 0})
+              </button>
+            </div>
+          </div>
+
+          {/* Recipe Form Modal */}
+          <RecipeForm
+            recipeData={editingRecipe || newRecipe}
+            isVisible={isFormVisible}
+            onClose={resetFormState}
+            onSubmit={handleFormSubmit}
+            onInputChange={handleInputChange}
+            onBrandChange={handleBrandChange}
+            onImageUpload={handleImageUpload}
+            onClearImage={clearImage}
+            isProcessingImage={isProcessingImage}
+            fileInputRef={fileInputRef} // PASS REF HERE
+          />
+          
+          {/* Debug Screen Modal */}
+          <DebugScreen 
+            isVisible={isDebugMenuOpen}
+            onClose={() => setIsDebugMenuOpen(false)}
+            handleDeleteAllRecipes={handleDeleteAllRecipes}
+            userId={userId} // PASS USER ID HERE
+          />
+          
+          {/* Detail View Modal */}
+          <RecipeDetailModal
+              recipe={selectedRecipe}
+              isVisible={!!selectedRecipe}
+              onClose={() => setSelectedRecipe(null)}
+              userId={userId}
+              toggleFavorite={toggleFavorite}
+              toggleEndorsement={toggleEndorsement}
+              setEditingRecipe={setEditingRecipe}
+              handleDeleteRecipe={handleDeleteRecipe}
+          />
+
+
+          {/* Grid Content */}
+          <a id="v0.8.006"></a> {/* Anchor for version tracking */}
+          {filteredRecipes.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-20 text-center bg-white rounded-3xl border border-gray-100 shadow-sm">
+                  <div className="bg-gray-100 p-4 rounded-full mb-4">
+                      <ImageIcon className="w-8 h-8 text-gray-400" />
+                  </div>
+                  <h3 className="text-lg font-medium text-gray-900">
+                      {filterBrand === 'Favorites' ? "You haven't bookmarked any recipes yet." : "No recipes found"}
+                  </h3>
+                  <p className="text-gray-500 max-w-sm mt-2">Try adjusting your search or filters, or be the first to contribute.</p>
+              </div>
+          ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
+                {filteredRecipes.map(recipe => (
+                  <RecipeCard 
+                    key={recipe.id} 
+                    recipe={recipe} 
+                    userId={userId}
+                    isFavorite={favoriteRecipeIds.has(recipe.id)}
+                    toggleFavorite={toggleFavorite}
+                    toggleEndorsement={toggleEndorsement}
+                    setEditingRecipe={setEditingRecipe}
+                    handleDeleteRecipe={handleDeleteRecipe}
+                    setSelectedRecipe={setSelectedRecipe} // Pass state setter
+                  />
+                ))}
+              </div>
+          )}
+          
+        </main>
+      </div>
+    </React.Fragment>
+  );
+}
+    // END PASTE BLOCK
+    
+    // RENDER APP
+    document.addEventListener('DOMContentLoaded', () => {
+      ReactDOM.render(
+          <App />,
+          document.getElementById('root')
+      );
+    });
+    </script>
+</body>
+</html>
