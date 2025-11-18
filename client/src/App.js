@@ -4,8 +4,7 @@ import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged }
 import { getFirestore, collection, onSnapshot, query, addDoc, setDoc, doc, deleteDoc, updateDoc, arrayUnion, arrayRemove, serverTimestamp, getDocs, writeBatch } from 'firebase/firestore';
 import { Camera, Image as ImageIcon, PlusCircle, Aperture, Search, Zap, UploadCloud, X, Settings, Bookmark, Star, BookOpen, MoreVertical, Edit, Trash2, Bug, AlertTriangle, Info } from 'lucide-react';
 
-// Your web app's Firebase configuration
-// For Firebase JS SDK v7.20.0 and later, measurementId is optional
+// --- CONFIGURATION ---
 const firebaseConfig = {
   apiKey: "AIzaSyDwNm5YCEjmkVIjTbj9qvlj5KOptuEld48",
   authDomain: "the-recipe-book-5408d.firebaseapp.com",
@@ -16,11 +15,14 @@ const firebaseConfig = {
   measurementId: "G-N5QVD88JG9"
 };
 
-const appId = 'default-app-id';
-const RECIPES_COLLECTION_PATH = 'artifacts/' + appId + '/public/data/cameraRecipes';
+// ---------------------------------------
+// 1. CONSTANTS & DATA MODELS
+// ---------------------------------------
+// We use the appId from the user's key to segment data if needed, 
+// but for now we keep the path simple.
+const RECIPES_COLLECTION_PATH = 'public_recipes'; // Simplified for your live app
 const SITE_TITLE = 'The Recipe Book'; 
 
-// --- CONSTANTS & DATA ---
 const BASE_PROFILES_BY_BRAND = {
     'Fujifilm': ['PROVIA/Standard', 'Velvia/Vivid', 'ASTIA/Soft', 'Classic Chrome', 'ETERNA/Cinema', 'ETERNA Bleach Bypass', 'Classic Neg.', 'Nostalgic Negative', 'ACROS', 'ACROS + Ye Filter', 'ACROS + R Filter', 'ACROS + G Filter', 'Black & White', 'B&W + Filter', 'Sepia', 'Reala ACE'],
     'Canon': ['Standard', 'Portrait', 'Landscape', 'Fine Detail', 'Neutral', 'Faithful', 'Monochrome'],
@@ -93,7 +95,10 @@ const compressImage = (file) => {
   });
 };
 
-// --- COMPONENTS ---
+// ---------------------------------------
+// 2. SUB-COMPONENTS
+// ---------------------------------------
+
 const RecipeDetailModal = ({ recipe, isVisible, onClose, userId, toggleFavorite, toggleEndorsement, setEditingRecipe, handleDeleteRecipe }) => {
     if (!isVisible || !recipe) return null;
     const isEndorsed = recipe.endorserIds?.includes(userId) || false;
@@ -249,7 +254,9 @@ const DebugScreen = ({ isVisible, onClose, handleDeleteAllRecipes, userId }) => 
     );
 };
 
-// --- MAIN APP COMPONENT ---
+// ---------------------------------------
+// 3. MAIN APP COMPONENT
+// ---------------------------------------
 function App() {
   const [db, setDb] = useState(null);
   const [auth, setAuth] = useState(null);
@@ -272,7 +279,6 @@ function App() {
   const showCustomError = (message) => { setError(message); setTimeout(() => setError(null), 5000); };
 
   useEffect(() => {
-    if (!Object.keys(firebaseConfig).length) { setError("⚠️ Firebase config missing in App.js!"); setLoading(false); setIsAuthReady(true); return; }
     try {
       const app = initializeApp(firebaseConfig);
       const firestoreDb = getFirestore(app);
@@ -283,7 +289,7 @@ function App() {
         else { setUserId(user.uid); }
         setLoading(false); setIsAuthReady(true);
       });
-    } catch (e) { console.error(e); setError("Initialization failed."); setLoading(false); setIsAuthReady(true); }
+    } catch (e) { console.error(e); setError("Initialization failed. Check Keys."); setLoading(false); setIsAuthReady(true); }
   }, []);
 
   useEffect(() => {
@@ -296,7 +302,7 @@ function App() {
 
   useEffect(() => {
     if (!db || !isAuthReady || !userId) return;
-    const unsubscribe = onSnapshot(query(collection(db, `artifacts/${appId}/users/${userId}/favorites`)), (snapshot) => {
+    const unsubscribe = onSnapshot(query(collection(db, `users/${userId}/favorites`)), (snapshot) => {
       setFavoriteRecipeIds(new Set(snapshot.docs.map(doc => doc.id)));
     });
     return () => unsubscribe();
@@ -304,7 +310,7 @@ function App() {
 
   const toggleFavorite = async (recipeId, isFavorite) => {
     if (!db || !userId) return showCustomError("Auth required.");
-    const ref = doc(db, `artifacts/${appId}/users/${userId}/favorites`, recipeId);
+    const ref = doc(db, `users/${userId}/favorites`, recipeId);
     isFavorite ? await deleteDoc(ref) : await setDoc(ref, { favoritedAt: serverTimestamp(), recipeId });
   };
 
@@ -348,7 +354,21 @@ function App() {
 
   const handleBrandChange = (e) => {
     const val = e.target.value;
-    (editingRecipe ? setEditingRecipe : setNewRecipe)(prev => ({ ...prev, brand: val, model: BRAND_MODELS[val]?.[0] || '', baseProfile: BASE_PROFILES_BY_BRAND[val]?.[0] || '', ...initialFormState }));
+    const setter = editingRecipe ? setEditingRecipe : setNewRecipe;
+    
+    setter(prev => {
+        const newModel = BRAND_MODELS[val]?.[0] || '';
+        const newBaseProfile = BASE_PROFILES_BY_BRAND[val]?.[0] || '';
+        const blankSettings = CORE_PARAMS_MAP.reduce((acc, param) => ({ ...acc, [param.key]: '' }), {});
+        
+        return { 
+            ...prev, 
+            brand: val, 
+            model: newModel, 
+            baseProfile: newBaseProfile, 
+            ...blankSettings 
+        };
+    });
   };
   
   const handleImageUpload = async (e, inputRef) => {
