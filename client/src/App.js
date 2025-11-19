@@ -22,7 +22,7 @@ const appId = 'default-app-id';
 const RECIPES_COLLECTION_PATH = 'public_recipes'; 
 const SITE_TITLE = 'The Recipe Book'; 
 
-// Helper to generate number ranges (e.g. -4 to +4)
+// Helper to generate number ranges
 const range = (start, end) => Array.from({length: end - start + 1}, (_, i) => (start + i).toString());
 const plusRange = (start, end) => Array.from({length: end - start + 1}, (_, i) => (start + i) > 0 ? `+${start + i}` : (start + i).toString());
 
@@ -35,20 +35,23 @@ const BASE_PROFILES_BY_BRAND = {
     'Olympus/OM System': ['i-Enhance', 'Vivid', 'Natural', 'Muted', 'Portrait', 'Monotone', 'Custom1', 'Custom2', 'Sepia', 'Art Filter (Various)']
 };
 
-// --- NEW: SMART OPTIONS PER BRAND ---
+// --- SMART OPTIONS PER BRAND ---
 const BRAND_SPECIFIC_OPTIONS = {
     'Fujifilm': {
         dynamicRange: ['DR100', 'DR200', 'DR400', 'DR-P (Strong)', 'DR-P (Weak)', 'Auto', 'Off'],
-        highlightTone: plusRange(-2, 4), // -2 to +4
+        highlightTone: plusRange(-2, 4),
         shadowTone: plusRange(-2, 4),
         colorSaturation: plusRange(-4, 4),
         sharpness: plusRange(-4, 4),
         noiseReduction: plusRange(-4, 4),
         clarity: plusRange(-5, 5),
-        wbShift: [] // Keep as text for now as it's complex (R:X B:Y)
+        // Fuji Specifics
+        grainEffect: ['Off', 'Weak Small', 'Weak Large', 'Strong Small', 'Strong Large'],
+        chromeEffect: ['Off', 'Weak', 'Strong'],
+        chromeBlue: ['Off', 'Weak', 'Strong'],
     },
     'Nikon': {
-        dynamicRange: ['Auto', 'Extra High', 'High', 'Normal', 'Low', 'Off'], // ADL
+        dynamicRange: ['Auto', 'Extra High', 'High', 'Normal', 'Low', 'Off'],
         sharpening: range(0, 9),
         clarity: plusRange(-5, 5),
         contrast: plusRange(-3, 3),
@@ -58,7 +61,7 @@ const BRAND_SPECIFIC_OPTIONS = {
         noiseReduction: ['Off', 'Low', 'Normal', 'High']
     },
     'Canon': {
-        dynamicRange: ['Disable', 'Low', 'Standard', 'High'], // ALO
+        dynamicRange: ['Disable', 'Low', 'Standard', 'High'],
         sharpness: range(0, 7),
         contrast: range(-4, 4),
         saturation: range(-4, 4),
@@ -66,8 +69,8 @@ const BRAND_SPECIFIC_OPTIONS = {
         noiseReduction: ['Disable', 'Low', 'Standard', 'High', 'Multi Shot']
     },
     'Sony': {
-        dynamicRange: ['Off', 'Auto', 'Lv1', 'Lv2', 'Lv3', 'Lv4', 'Lv5'], // DRO
-        sharpness: range(0, 9), // Creative Look ranges vary, sticking to generic wide range
+        dynamicRange: ['Off', 'Auto', 'Lv1', 'Lv2', 'Lv3', 'Lv4', 'Lv5'],
+        sharpness: range(0, 9),
         clarity: range(0, 9),
         noiseReduction: ['Off', 'Low', 'Normal']
     },
@@ -93,17 +96,23 @@ const BRAND_MODELS = {
 
 const IMAGE_CONFIG = { maxWidth: 800, quality: 0.75, maxInputSizeMB: 10, outputFormat: 'image/jpeg' };
 
+// --- UPDATED: BRAND AWARENESS IN PARAMS ---
 const CORE_PARAMS_MAP = [
   { key: 'baseProfile', genericLabel: 'Base Profile / Simulation', labels: { 'Fujifilm': 'Film Simulation', 'Canon': 'Picture Style', 'Nikon': 'Picture Control', 'Sony': 'Creative Style / Look', 'Ricoh': 'Image Control', 'Olympus/OM System': 'Picture Mode' }},
-  { key: 'whiteBalance', genericLabel: 'White Balance Preset', labels: { 'Fujifilm': 'White Balance Preset', 'Canon': 'White Balance Preset', 'Nikon': 'White Balance Preset', 'Sony': 'White Balance Preset', 'Ricoh': 'White Balance Preset', 'Olympus/OM System': 'White Balance Preset' }},
-  { key: 'wbShift', genericLabel: 'WB Shift / Color Tone', labels: { 'Fujifilm': 'WB Shift', 'Canon': 'Color Tone', 'Nikon': 'WB Adjust', 'Sony': 'Color Phase', 'Ricoh': 'WB Adjustment', 'Olympus/OM System': 'WB Custom Adj' }},
-  { key: 'highlightTone', genericLabel: 'Highlights / Tone Hi', labels: { 'Fujifilm': 'Highlight Tone', 'Canon': 'Contrast (Hi)', 'Nikon': 'Highlights', 'Sony': 'Highlights', 'Ricoh': 'Contrast (Hi)', 'Olympus/OM System': 'Highlight' }},
-  { key: 'shadowTone', genericLabel: 'Shadow Tone', labels: { 'Fujifilm': 'Shadow Tone', 'Canon': 'Contrast (Lo)', 'Nikon': 'Shadows', 'Sony': 'Shadows', 'Ricoh': 'Contrast (Lo)', 'Olympus/OM System': 'Shadow' }},
-  { key: 'colorSaturation', genericLabel: 'Color / Saturation', labels: { 'Fujifilm': 'Color', 'Canon': 'Saturation', 'Nikon': 'Saturation', 'Sony': 'Saturation', 'Ricoh': 'Saturation', 'Olympus/OM System': 'Color' }},
-  { key: 'sharpness', genericLabel: 'Sharpness / Detail', labels: { 'Fujifilm': 'Sharpness', 'Canon': 'Sharpness', 'Nikon': 'Sharpening', 'Sony': 'Sharpening / Detail', 'Ricoh': 'Sharpness', 'Olympus/OM System': 'Sharpness' }},
-  { key: 'dynamicRange', genericLabel: 'Dynamic Range Comp.', labels: { 'Fujifilm': 'DR Setting', 'Canon': 'ALO', 'Nikon': 'ADL', 'Sony': 'DRO / HDR', 'Ricoh': 'DR Comp.', 'Olympus/OM System': 'Gradation' }},
-  { key: 'clarity', genericLabel: 'Clarity / Tonal Curve', labels: { 'Fujifilm': 'Clarity', 'Canon': 'Clarity', 'Nikon': 'Clarity', 'Sony': 'Clarity', 'Ricoh': 'Clarity/Curve', 'Olympus/OM System': 'Midtones' }},
-  { key: 'noiseReduction', genericLabel: 'Noise Reduction (NR)', labels: { 'Fujifilm': 'Noise Reduction', 'Canon': 'Noise Reduction', 'Nikon': 'High ISO NR', 'Sony': 'Noise Reduction', 'Ricoh': 'Noise Reduction', 'Olympus/OM System': 'Noise Reduction' }},
+  { key: 'dynamicRange', genericLabel: 'Dynamic Range', labels: { 'Fujifilm': 'DR Setting', 'Canon': 'ALO', 'Nikon': 'ADL', 'Sony': 'DRO / HDR', 'Ricoh': 'DR Comp.', 'Olympus/OM System': 'Gradation' }},
+  { key: 'whiteBalance', genericLabel: 'White Balance', labels: { 'Fujifilm': 'WB Preset', 'Canon': 'WB Preset', 'Nikon': 'WB Preset', 'Sony': 'WB Preset', 'Ricoh': 'WB Preset', 'Olympus/OM System': 'WB Preset' }},
+  { key: 'wbShift', genericLabel: 'WB Shift', labels: { 'Fujifilm': 'WB Shift', 'Canon': 'Color Tone', 'Nikon': 'WB Adjust', 'Sony': 'Color Phase', 'Ricoh': 'WB Adj', 'Olympus/OM System': 'WB Custom Adj' }},
+  { key: 'highlightTone', genericLabel: 'Highlights', labels: { 'Fujifilm': 'Highlight Tone', 'Canon': 'Contrast (Hi)', 'Nikon': 'Highlights', 'Sony': 'Highlights', 'Ricoh': 'Contrast (Hi)', 'Olympus/OM System': 'Highlight' }},
+  { key: 'shadowTone', genericLabel: 'Shadows', labels: { 'Fujifilm': 'Shadow Tone', 'Canon': 'Contrast (Lo)', 'Nikon': 'Shadows', 'Sony': 'Shadows', 'Ricoh': 'Contrast (Lo)', 'Olympus/OM System': 'Shadow' }},
+  { key: 'colorSaturation', genericLabel: 'Color', labels: { 'Fujifilm': 'Color', 'Canon': 'Saturation', 'Nikon': 'Saturation', 'Sony': 'Saturation', 'Ricoh': 'Saturation', 'Olympus/OM System': 'Color' }},
+  { key: 'sharpness', genericLabel: 'Sharpness', labels: { 'Fujifilm': 'Sharpness', 'Canon': 'Sharpness', 'Nikon': 'Sharpening', 'Sony': 'Sharpening', 'Ricoh': 'Sharpness', 'Olympus/OM System': 'Sharpness' }},
+  { key: 'noiseReduction', genericLabel: 'Noise Reduction', labels: { 'Fujifilm': 'High ISO NR', 'Canon': 'High ISO NR', 'Nikon': 'High ISO NR', 'Sony': 'High ISO NR', 'Ricoh': 'High ISO NR', 'Olympus/OM System': 'Noise Filter' }},
+  { key: 'clarity', genericLabel: 'Clarity', labels: { 'Fujifilm': 'Clarity', 'Canon': 'Clarity', 'Nikon': 'Clarity', 'Sony': 'Clarity', 'Ricoh': 'Clarity', 'Olympus/OM System': 'Midtones' }},
+  
+  // --- BRAND SPECIFIC FIELDS ---
+  { key: 'grainEffect', genericLabel: 'Grain Effect', supportedBrands: ['Fujifilm'], labels: { 'Fujifilm': 'Grain Effect' } },
+  { key: 'chromeEffect', genericLabel: 'Color Chrome Effect', supportedBrands: ['Fujifilm'], labels: { 'Fujifilm': 'Color Chrome Effect' } },
+  { key: 'chromeBlue', genericLabel: 'Color Chrome FX Blue', supportedBrands: ['Fujifilm'], labels: { 'Fujifilm': 'Color Chrome FX Blue' } },
 ];
 
 const initialFormState = {
@@ -116,6 +125,12 @@ const getLabelForBrand = (key, brand) => {
   const param = CORE_PARAMS_MAP.find(p => p.key === key);
   if (!param) return key;
   return param.labels[brand] || param.genericLabel.split('/')[0].trim();
+};
+
+// Helper to check if a param should be shown for the current brand
+const isFieldVisible = (param, currentBrand) => {
+    if (!param.supportedBrands) return true; // Universal field
+    return param.supportedBrands.includes(currentBrand);
 };
 
 const compressImage = (file) => {
@@ -153,10 +168,13 @@ const RecipeDetailModal = ({ recipe, isVisible, onClose, userId, toggleFavorite,
     const isOwner = recipe.userId === userId;
     const isFavorite = recipe.isFavorite || false;
 
-    const allSettings = CORE_PARAMS_MAP.map(param => ({
-        key: param.key, label: getLabelForBrand(param.key, recipe.brand),
-        value: recipe[param.key] || '---', genericLabel: param.genericLabel.split('/')[0].trim(),
-    }));
+    // Filter settings to only show what is relevant for this brand OR has a value
+    const allSettings = CORE_PARAMS_MAP
+        .filter(param => isFieldVisible(param, recipe.brand) && recipe[param.key])
+        .map(param => ({
+            key: param.key, label: getLabelForBrand(param.key, recipe.brand),
+            value: recipe[param.key], genericLabel: param.genericLabel,
+        }));
 
     return (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
@@ -192,7 +210,8 @@ const RecipeDetailModal = ({ recipe, isVisible, onClose, userId, toggleFavorite,
                     </div>
                     <div className="lg:col-span-2 p-6">
                         <h3 className="text-xl font-bold text-gray-800 mb-4 flex items-center"><Aperture className="w-5 h-5 mr-2 text-[#FF654F]" />Full Settings List</h3>
-                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-6">
+                        {/* CHANGED: Using grid-cols-2 md:grid-cols-3 for denser packing on desktop */}
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-6">
                             {allSettings.map(setting => (<div key={setting.key}><p className="text-xs font-bold uppercase text-gray-500 tracking-wider mb-0.5">{setting.label}</p><p className="text-lg font-mono font-medium text-gray-900">{setting.value}</p></div>))}
                         </div>
                     </div>
@@ -204,7 +223,7 @@ const RecipeDetailModal = ({ recipe, isVisible, onClose, userId, toggleFavorite,
 };
 
 const RecipeCard = ({ recipe, userId, isFavorite, toggleFavorite, toggleEndorsement, setEditingRecipe, handleDeleteRecipe, setSelectedRecipe }) => {
-  const settingsWithValues = CORE_PARAMS_MAP.filter(param => recipe[param.key] && recipe[param.key].trim() !== '');
+  const settingsWithValues = CORE_PARAMS_MAP.filter(param => isFieldVisible(param, recipe.brand) && recipe[param.key] && recipe[param.key].trim() !== '');
   const isEndorsed = recipe.endorserIds?.includes(userId) || false;
   const endorsementCount = recipe.endorserIds?.length || 0;
   const isOwner = recipe.userId === userId;
@@ -276,13 +295,18 @@ const RecipeForm = ({ recipeData, isVisible, onClose, onSubmit, onInputChange, o
                     </div>
                     <div className="bg-[#FF654F]/10 rounded-xl p-5 mb-6 border border-[#FF654F]/30">
                         <h3 className="text-sm font-bold text-[#FF654F] mb-4 flex items-center"><Aperture className="w-4 h-4 mr-2" />Settings ({recipeData.brand})</h3>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        {/* CHANGED: Using grid-cols-1 sm:grid-cols-3 for denser form packing */}
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                             <div><label className="block text-xs font-medium text-gray-600 mb-1">{getLabelForBrand('baseProfile', recipeData.brand)} *</label><select name="baseProfile" value={recipeData.baseProfile} onChange={onInputChange} className="w-full text-sm border-gray-300 rounded-md focus:ring-[#FF654F] focus:border-[#FF654F]" required>{BASE_PROFILES_BY_BRAND[recipeData.brand]?.map(profile => <option key={profile} value={profile}>{profile}</option>)}</select></div>
+                            
                             {CORE_PARAMS_MAP.filter(p => p.key !== 'baseProfile').map(param => {
+                                // VISIBILITY CHECK: Only show if universal OR belongs to this brand
+                                if (!isFieldVisible(param, recipeData.brand)) return null;
+
                                 const options = BRAND_SPECIFIC_OPTIONS[recipeData.brand]?.[param.key];
                                 return (
                                   <div key={param.key}>
-                                    <label className="block text-xs font-medium text-gray-600 mb-1">{param.genericLabel.split('/')[0].trim()}</label>
+                                    <label className="block text-xs font-medium text-gray-600 mb-1">{getLabelForBrand(param.key, recipeData.brand)}</label>
                                     {options ? (
                                       <select name={param.key} value={recipeData[param.key]} onChange={onInputChange} className="w-full text-sm border-gray-300 rounded-md focus:ring-[#FF654F] focus:border-[#FF654F]">
                                         <option value="">Select...</option>
