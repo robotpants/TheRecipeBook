@@ -28,7 +28,7 @@ const firebaseConfig = {
 // ---------------------------------------
 // 1. CONSTANTS & DATA MODELS
 // ---------------------------------------
-const APP_VERSION = 'v0.1.012';
+const APP_VERSION = 'v0.1.013';
 const RECIPES_COLLECTION_PATH = 'public_recipes'; 
 const SITE_TITLE = 'The Recipe Book'; 
 
@@ -41,9 +41,9 @@ const plusRange = (start, end) => Array.from({length: end - start + 1}, (_, i) =
 
 const BASE_PROFILES_BY_BRAND = {
     'Fujifilm': ['PROVIA/Standard', 'Velvia/Vivid', 'ASTIA/Soft', 'Classic Chrome', 'ETERNA/Cinema', 'ETERNA Bleach Bypass', 'Classic Neg.', 'Nostalgic Negative', 'ACROS', 'ACROS + Ye Filter', 'ACROS + R Filter', 'ACROS + G Filter', 'Black & White', 'B&W + Filter', 'Sepia', 'Reala ACE'],
-    'Canon': ['Standard', 'Portrait', 'Landscape', 'Fine Detail', 'Neutral', 'Faithful', 'Monochrome', 'Auto'],
+    'Canon': ['Standard', 'Portrait', 'Landscape', 'Fine Detail', 'Neutral', 'Faithful', 'Monochrome'],
     'Nikon': ['Standard', 'Portrait', 'Landscape', 'Flat', 'Dream', 'Morning', 'Pop', 'Sunday', 'Somber', 'Dramatic', 'Silence', 'Bleached', 'Melancholic', 'Pure', 'Denim', 'Toy', 'Sepia', 'Blue', 'Red', 'Pink', 'Charcoal', 'Graphite', 'Binary', 'Carbon'],
-    'Sony': ['ST (Standard)', 'PT (Portrait)', 'LA (Landscape)', 'VV (Vivid)', 'VV2', 'FL', 'IN', 'SH', 'BW', 'SE'],
+    'Sony': ['ST (Standard)', 'PT (Portrait)', 'LA (Landscape)', 'VV (Vivid)', 'Clear', 'Deep', 'Light', 'M (Sepia)', 'W (Black/White)', 'Creative Look (FL)', 'Creative Look (IN)', 'Creative Look (SH)'],
     'Ricoh': ['Standard', 'Vivid', 'Monotone', 'Soft Monotone', 'Hard Monotone', 'Hi-Contrast B&W', 'Negative Film', 'Positive Film', 'Bleach Bypass', 'Retro', 'HDR Tone', 'Cross Process'],
     'Olympus/OM System': ['i-Enhance', 'Vivid', 'Natural', 'Muted', 'Portrait', 'Monotone', 'Custom1', 'Custom2', 'Sepia', 'Art Filter (Various)']
 };
@@ -51,6 +51,7 @@ const BASE_PROFILES_BY_BRAND = {
 // --- SMART OPTIONS PER BRAND ---
 const BRAND_SPECIFIC_OPTIONS = {
     'Fujifilm': {
+        whiteBalance: ['Auto', 'Custom', 'Color Temperature (K)', 'Daylight', 'Shade', 'Fluorescent 1', 'Fluorescent 2', 'Fluorescent 3', 'Incandescent', 'Underwater'],
         dynamicRange: ['DR100', 'DR200', 'DR400', 'DR-P (Strong)', 'DR-P (Weak)', 'Auto', 'Off'],
         highlightTone: plusRange(-2, 4),
         shadowTone: plusRange(-2, 4),
@@ -63,6 +64,7 @@ const BRAND_SPECIFIC_OPTIONS = {
         chromeBlue: ['Off', 'Weak', 'Strong'],
     },
     'Nikon': {
+        whiteBalance: ['Auto', 'Natural Light Auto', 'Direct Sunlight', 'Cloudy', 'Shade', 'Incandescent', 'Fluorescent', 'Flash', 'Choose Color Temp', 'Preset Manual'],
         dynamicRange: ['Auto', 'Extra High', 'High', 'Normal', 'Low', 'Off'], // ADL
         sharpening: range(0, 9),
         clarity: plusRange(-5, 5),
@@ -73,6 +75,7 @@ const BRAND_SPECIFIC_OPTIONS = {
         noiseReduction: ['Off', 'Low', 'Normal', 'High']
     },
     'Canon': {
+        whiteBalance: ['Auto', 'Daylight', 'Shade', 'Cloudy', 'Tungsten', 'White Fluorescent', 'Flash', 'Custom', 'Color Temp'],
         dynamicRange: ['Disable', 'Low', 'Standard', 'High'], // ALO
         sharpness: range(0, 7),
         contrast: range(-4, 4),
@@ -82,25 +85,28 @@ const BRAND_SPECIFIC_OPTIONS = {
         clarity: range(-4, 4)
     },
     'Sony': {
+        whiteBalance: ['Auto', 'Daylight', 'Shade', 'Cloudy', 'Incandescent', 'Fluor.: Warm White', 'Fluor.: Cool White', 'Fluor.: Day White', 'Fluor.: Daylight', 'Flash', 'Underwater', 'C.Temp./Filter', 'Custom'],
         dynamicRange: ['Off', 'Auto', 'Lv1', 'Lv2', 'Lv3', 'Lv4', 'Lv5'], // DRO
         sharpness: range(0, 9),
         clarity: range(0, 9),
         noiseReduction: ['Off', 'Low', 'Normal'],
-        highlightTone: range(-9, 9), // Highlights
-        shadowTone: range(-9, 9),    // Shadows
-        colorSaturation: range(-9, 9) // Saturation
+        highlightTone: range(-9, 9),
+        shadowTone: range(-9, 9),
+        colorSaturation: range(-9, 9)
     },
     'Ricoh': {
+        whiteBalance: ['Auto', 'Multi Auto', 'Daylight', 'Shade', 'Cloudy', 'Fl. Daylight', 'Fl. Neutral White', 'Fl. Cool White', 'Fl. Warm White', 'Tungsten', 'CTE', 'Manual', 'Color Temp'],
         dynamicRange: ['Off', 'Auto', 'Weak', 'Medium', 'Strong'],
         sharpness: range(-4, 4),
         contrast: range(-4, 4),
         clarity: range(-4, 4),
-        highlightTone: range(-4, 4), 
+        highlightTone: range(-4, 4),
         shadowTone: range(-4, 4),
         colorSaturation: range(-4, 4),
         noiseReduction: ['Off', 'Low', 'High', 'Auto']
     },
     'Olympus/OM System': {
+        whiteBalance: ['Auto', 'Sunny', 'Shadow', 'Cloudy', 'Incandescent', 'Fluorescent', 'Underwater', 'Flash', 'Custom', 'Color Temp'],
         dynamicRange: ['Auto', 'Normal', 'High Key', 'Low Key'],
         highlightTone: range(-7, 7),
         shadowTone: range(-7, 7),
@@ -308,6 +314,9 @@ const RecipeDetailModal = ({ recipe, isVisible, onClose, userId, isAdmin, toggle
     const isOwner = recipe.userId === userId;
     const isFavorite = recipe.isFavorite || false;
 
+    // ✅ ADMIN POWER: Can edit/delete if Owner OR Admin
+    const canModify = isAdmin || isOwner;
+
     const allSettings = CORE_PARAMS_MAP
         .filter(param => isFieldVisible(param, recipe.brand) && recipe[param.key])
         .map(param => ({ key: param.key, label: getLabelForBrand(param.key, recipe.brand), value: recipe[param.key], genericLabel: param.genericLabel }));
@@ -323,8 +332,7 @@ const RecipeDetailModal = ({ recipe, isVisible, onClose, userId, isAdmin, toggle
                         </p>
                     </div>
                     <div className="flex space-x-3 items-center">
-                        {/* ✅ ADMIN POWER: Can edit/delete if Owner OR Admin */}
-                        {(isOwner || isAdmin) && ( <>
+                        {canModify && ( <>
                             <button onClick={() => {setEditingRecipe(recipe); onClose();}} className="p-3 rounded-full text-blue-600 hover:bg-blue-50 transition"><Edit className="w-5 h-5" /></button>
                             <button onClick={() => {handleDeleteRecipe(recipe.id, recipe.name); onClose();}} className="p-3 rounded-full text-red-600 hover:bg-red-50 transition"><Trash2 className="w-5 h-5" /></button>
                         </> )}
@@ -362,14 +370,14 @@ const RecipeDetailModal = ({ recipe, isVisible, onClose, userId, isAdmin, toggle
     );
 };
 
-const RecipeCard = ({ recipe, userId, isAdmin, isFavorite, toggleFavorite, toggleEndorsement, onEditClick, handleDeleteRecipe, setSelectedRecipe }) => {
+const RecipeCard = ({ recipe, userId, isAdmin, isFavorite, toggleFavorite, toggleEndorsement, setEditingRecipe, handleDeleteRecipe, setSelectedRecipe }) => {
   const settingsWithValues = CORE_PARAMS_MAP.filter(param => isFieldVisible(param, recipe.brand) && recipe[param.key] && recipe[param.key].trim() !== '');
   const isEndorsed = recipe.endorserIds?.includes(userId) || false;
   const endorsementCount = recipe.endorserIds?.length || 0;
-  const isOwner = recipe.userId === userId;
   
   // ✅ ADMIN POWER: Can edit/delete if Owner OR Admin
-  const canModify = isOwner || isAdmin;
+  const isOwner = recipe.userId && recipe.userId === userId;
+  const canModify = isAdmin || isOwner;
 
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const menuRef = useRef(null);
@@ -384,20 +392,25 @@ const RecipeCard = ({ recipe, userId, isAdmin, isFavorite, toggleFavorite, toggl
     <div className="group bg-white/95 backdrop-blur-sm rounded-xl shadow-lg border border-gray-100 hover:shadow-2xl transition-all duration-300 overflow-hidden flex flex-col cursor-pointer" onClick={() => setSelectedRecipe(Object.assign({}, recipe, { isFavorite }))}>
       <div className="relative h-48 w-full bg-gray-100 overflow-hidden">
         {recipe.imageUrl ? <img src={recipe.imageUrl} alt={recipe.name} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" /> : <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-gray-100 to-gray-200 text-gray-300"><Camera className="w-12 h-12 mb-2 opacity-20" /><span className="text-xs font-mono opacity-40">No Preview</span></div>}
+        
         <div className="absolute top-3 right-3 flex items-center space-x-2">
             <button onClick={(e) => { e.stopPropagation(); toggleEndorsement(recipe.id, isEndorsed); }} className={`flex items-center text-xs font-semibold px-2.5 py-1 rounded-full shadow-md transition-all ${isEndorsed ? 'bg-yellow-500 text-white' : 'bg-white text-gray-700 hover:bg-yellow-100'}`}><Star className={`w-3 h-3 mr-1 ${isEndorsed ? 'fill-white' : 'fill-gray-400'}`} />{endorsementCount}</button>
             <button onClick={(e) => { e.stopPropagation(); toggleFavorite(recipe.id, isFavorite); }} className={`p-2 rounded-full shadow-md transition-all ${isFavorite ? 'bg-[#FF654F] text-white' : 'bg-white text-gray-400 hover:text-[#FF654F] hover:bg-gray-100'}`}><Bookmark className={`w-4 h-4 ${isFavorite ? 'fill-white' : 'fill-gray-400'}`} /></button>
             
             {/* EDIT MENU: Visible if Owner OR Admin */}
-            {canModify && (<div ref={menuRef} className="relative"><button onClick={(e) => { e.stopPropagation(); setIsMenuOpen(!isMenuOpen); }} className="p-2 rounded-full bg-white text-gray-400 hover:text-gray-600 shadow-md transition-all"><MoreVertical className="w-4 h-4" /></button>{isMenuOpen && (<div className="absolute right-0 top-10 w-32 bg-white rounded-lg shadow-xl overflow-hidden z-30 border border-gray-100"><button onClick={(e) => {e.stopPropagation(); onEditClick(recipe); setIsMenuOpen(false);}} className="flex items-center w-full px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 transition"><Edit className="w-4 h-4 mr-2 text-blue-500" /> Edit</button><button onClick={(e) => {e.stopPropagation(); handleDeleteRecipe(recipe.id, recipe.name); setIsMenuOpen(false);}} className="flex items-center w-full px-3 py-2 text-sm text-red-600 hover:bg-red-50 transition"><Trash2 className="w-4 h-4 mr-2" /> Delete</button></div>)}</div>)}
+            {canModify && (<div ref={menuRef} className="relative"><button onClick={(e) => { e.stopPropagation(); setIsMenuOpen(!isMenuOpen); }} className="p-2 rounded-full bg-white text-gray-400 hover:text-gray-600 shadow-md transition-all"><MoreVertical className="w-4 h-4" /></button>{isMenuOpen && (<div className="absolute right-0 top-10 w-32 bg-white rounded-lg shadow-xl overflow-hidden z-30 border border-gray-100"><button onClick={(e) => {e.stopPropagation(); setEditingRecipe(recipe); setIsMenuOpen(false);}} className="flex items-center w-full px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 transition"><Edit className="w-4 h-4 mr-2 text-blue-500" /> Edit</button><button onClick={(e) => {e.stopPropagation(); handleDeleteRecipe(recipe.id, recipe.name); setIsMenuOpen(false);}} className="flex items-center w-full px-3 py-2 text-sm text-red-600 hover:bg-red-50 transition"><Trash2 className="w-4 h-4 mr-2" /> Delete</button></div>)}</div>)}
         </div>
+
         <div className="absolute top-3 left-3 bg-white/90 backdrop-blur px-3 py-1 rounded-full text-xs font-bold text-gray-700 shadow-sm border border-gray-100">{recipe.brand}</div>
       </div>
       <div className="p-5 flex-1 flex flex-col">
         <div className="mb-4 border-b border-gray-100 pb-3">
           <h3 className="text-xl font-extrabold text-gray-800 leading-tight mb-1">{recipe.name}</h3>
-          <p className="text-sm font-medium text-gray-500 flex items-center"><Camera className="w-3 h-3 mr-1.5 text-gray-400" />{recipe.model || 'All Models'}</p>
-          {isOwner && <span className="text-xs text-blue-500 font-bold mt-1 inline-block">My Recipe</span>}
+          <div className="flex justify-between items-start">
+             <p className="text-sm font-medium text-gray-500 flex items-center"><Camera className="w-3 h-3 mr-1.5 text-gray-400" />{recipe.model || 'All Models'}</p>
+             {/* MY RECIPE TAG: Only visible if you are the owner */}
+             {isOwner && <span className="text-xs bg-blue-100 text-blue-600 px-2 py-0.5 rounded font-bold">My Recipe</span>}
+          </div>
         </div>
         <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs mb-4">
           {settingsWithValues.slice(0, 6).map((param) => (<div key={param.key} className="flex flex-col"><span className="font-semibold text-gray-500 text-[10px] uppercase tracking-wider">{getLabelForBrand(param.key, recipe.brand)}</span><span className="text-[#FF654F] font-medium font-mono truncate" title={recipe[param.key]}>{recipe[param.key]}</span></div>))}
@@ -790,9 +803,6 @@ function App() {
         </header>
         {error && <div className="fixed top-20 left-1/2 transform -translate-x-1/2 z-50 px-6 py-3 bg-red-500 text-white rounded-full shadow-xl text-sm font-medium animate-bounce">{error}</div>}
         <main className="max-w-7xl mx-auto px-4 py-8">
-          
-          {/* WELCOME BANNER REMOVED PER REQUEST */}
-
           <div className="flex flex-col md:flex-row gap-4 mb-8">
             <div className="relative flex-1"><Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" /><input type="text" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder="Search recipes..." className="w-full pl-12 pr-4 py-3 rounded-xl border-none bg-white shadow-sm focus:ring-2 focus:ring-[#FF654F]" /></div>
             <div className="flex gap-2 overflow-x-auto pb-2 md:pb-0 hide-scrollbar">
