@@ -28,7 +28,7 @@ const firebaseConfig = {
 // ---------------------------------------
 // 1. CONSTANTS & DATA MODELS
 // ---------------------------------------
-const APP_VERSION = 'v0.1.009';
+const APP_VERSION = 'v0.1.010';
 const RECIPES_COLLECTION_PATH = 'public_recipes'; 
 const SITE_TITLE = 'The Recipe Book'; 
 
@@ -285,14 +285,13 @@ const AboutModal = ({ isVisible, onClose }) => {
     );
 };
 
-const RecipeDetailModal = ({ recipe, isVisible, onClose, userId, isAdmin, toggleFavorite, toggleEndorsement, setEditingRecipe, handleDeleteRecipe }) => {
+const RecipeDetailModal = ({ recipe, isVisible, onClose, userId, isAdmin, toggleFavorite, toggleEndorsement, onEditClick, handleDeleteRecipe }) => {
     if (!isVisible || !recipe) return null;
     const isEndorsed = recipe.endorserIds?.includes(userId) || false;
     const endorsementCount = recipe.endorserIds?.length || 0;
-    const isOwner = recipe.userId === userId;
+    const isOwner = recipe.userId && recipe.userId === userId;
     const isFavorite = recipe.isFavorite || false;
-
-    // ✅ ADMIN LOGIC: Admin always has modify rights, or if you are owner
+    // ✅ ADMIN POWER: Can edit/delete if Owner OR Admin
     const canModify = isAdmin || isOwner;
 
     const allSettings = CORE_PARAMS_MAP
@@ -311,7 +310,7 @@ const RecipeDetailModal = ({ recipe, isVisible, onClose, userId, isAdmin, toggle
                     </div>
                     <div className="flex space-x-3 items-center">
                         {canModify && ( <>
-                            <button onClick={() => {setEditingRecipe(recipe); onClose();}} className="p-3 rounded-full text-blue-600 hover:bg-blue-50 transition"><Edit className="w-5 h-5" /></button>
+                            <button onClick={() => onEditClick(recipe)} className="p-3 rounded-full text-blue-600 hover:bg-blue-50 transition"><Edit className="w-5 h-5" /></button>
                             <button onClick={() => {handleDeleteRecipe(recipe.id, recipe.name); onClose();}} className="p-3 rounded-full text-red-600 hover:bg-red-50 transition"><Trash2 className="w-5 h-5" /></button>
                         </> )}
                         <button onClick={onClose} className="p-3 rounded-full text-gray-400 hover:bg-gray-100 transition"><X className="w-6 h-6" /></button>
@@ -344,7 +343,7 @@ const RecipeDetailModal = ({ recipe, isVisible, onClose, userId, isAdmin, toggle
     );
 };
 
-const RecipeCard = ({ recipe, userId, isAdmin, isFavorite, toggleFavorite, toggleEndorsement, setEditingRecipe, handleDeleteRecipe, setSelectedRecipe }) => {
+const RecipeCard = ({ recipe, userId, isAdmin, isFavorite, toggleFavorite, toggleEndorsement, onEditClick, handleDeleteRecipe, setSelectedRecipe }) => {
   const settingsWithValues = CORE_PARAMS_MAP.filter(param => isFieldVisible(param, recipe.brand) && recipe[param.key] && recipe[param.key].trim() !== '');
   const isEndorsed = recipe.endorserIds?.includes(userId) || false;
   const endorsementCount = recipe.endorserIds?.length || 0;
@@ -372,7 +371,7 @@ const RecipeCard = ({ recipe, userId, isAdmin, isFavorite, toggleFavorite, toggl
             <button onClick={(e) => { e.stopPropagation(); toggleFavorite(recipe.id, isFavorite); }} className={`p-2 rounded-full shadow-md transition-all ${isFavorite ? 'bg-[#FF654F] text-white' : 'bg-white text-gray-400 hover:text-[#FF654F] hover:bg-gray-100'}`}><Bookmark className={`w-4 h-4 ${isFavorite ? 'fill-white' : 'fill-gray-400'}`} /></button>
             
             {/* EDIT MENU: Visible if Owner OR Admin */}
-            {canModify && (<div ref={menuRef} className="relative"><button onClick={(e) => { e.stopPropagation(); setIsMenuOpen(!isMenuOpen); }} className="p-2 rounded-full bg-white text-gray-400 hover:text-gray-600 shadow-md transition-all"><MoreVertical className="w-4 h-4" /></button>{isMenuOpen && (<div className="absolute right-0 top-10 w-32 bg-white rounded-lg shadow-xl overflow-hidden z-30 border border-gray-100"><button onClick={(e) => {e.stopPropagation(); setEditingRecipe(recipe); setIsMenuOpen(false);}} className="flex items-center w-full px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 transition"><Edit className="w-4 h-4 mr-2 text-blue-500" /> Edit</button><button onClick={(e) => {e.stopPropagation(); handleDeleteRecipe(recipe.id, recipe.name); setIsMenuOpen(false);}} className="flex items-center w-full px-3 py-2 text-sm text-red-600 hover:bg-red-50 transition"><Trash2 className="w-4 h-4 mr-2" /> Delete</button></div>)}</div>)}
+            {canModify && (<div ref={menuRef} className="relative"><button onClick={(e) => { e.stopPropagation(); setIsMenuOpen(!isMenuOpen); }} className="p-2 rounded-full bg-white text-gray-400 hover:text-gray-600 shadow-md transition-all"><MoreVertical className="w-4 h-4" /></button>{isMenuOpen && (<div className="absolute right-0 top-10 w-32 bg-white rounded-lg shadow-xl overflow-hidden z-30 border border-gray-100"><button onClick={(e) => {e.stopPropagation(); onEditClick(recipe); setIsMenuOpen(false);}} className="flex items-center w-full px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 transition"><Edit className="w-4 h-4 mr-2 text-blue-500" /> Edit</button><button onClick={(e) => {e.stopPropagation(); handleDeleteRecipe(recipe.id, recipe.name); setIsMenuOpen(false);}} className="flex items-center w-full px-3 py-2 text-sm text-red-600 hover:bg-red-50 transition"><Trash2 className="w-4 h-4 mr-2" /> Delete</button></div>)}</div>)}
         </div>
 
         <div className="absolute top-3 left-3 bg-white/90 backdrop-blur px-3 py-1 rounded-full text-xs font-bold text-gray-700 shadow-sm border border-gray-100">{recipe.brand}</div>
@@ -472,7 +471,6 @@ const RecipeForm = ({ recipeData, isVisible, onClose, onSubmit, onInputChange, o
     );
 };
 
-// --- UPDATED: NUCLEAR LAUNCH PROTECTION (State fixed) ---
 const DebugScreen = ({ isVisible, onClose, handleDeleteAllRecipes, userId }) => {
     const [accessCode, setAccessCode] = useState('');
     const [hasError, setHasError] = useState(false);
@@ -605,6 +603,14 @@ function App() {
     });
     return () => unsubscribe();
   }, [db, isAuthReady, userId]);
+  
+  // --- BUG FIX: Open form when editing recipe is selected ---
+  useEffect(() => {
+    if (editingRecipe) {
+      setIsFormVisible(true);
+      setSelectedRecipe(null); // Close detail modal if open
+    }
+  }, [editingRecipe]);
 
   // --- ACTIONS ---
   const toggleFavorite = async (recipeId, isFavorite) => {
@@ -632,6 +638,12 @@ function App() {
         
         await deleteDoc(doc(db, RECIPES_COLLECTION_PATH, recipeId));
     }
+  };
+  
+  // --- NEW: Handler to open form when clicking Edit
+  const handleEditClick = (recipe) => {
+      setEditingRecipe(recipe);
+      // Note: The useEffect above watches 'editingRecipe' and will open the form automatically
   };
 
   const handleDeleteAllRecipes = async () => {
@@ -773,9 +785,9 @@ function App() {
           <DebugScreen isVisible={isDebugMenuOpen} onClose={() => setIsDebugMenuOpen(false)} handleDeleteAllRecipes={handleDeleteAllRecipes} userId={userId} />
           <AboutModal isVisible={isAboutOpen} onClose={() => setIsAboutOpen(false)} />
           <AuthModal isVisible={isAuthModalOpen} onClose={() => setIsAuthModalOpen(false)} auth={auth} showCustomError={showCustomError} />
-          <RecipeDetailModal recipe={selectedRecipe} isVisible={!!selectedRecipe} onClose={() => setSelectedRecipe(null)} userId={userId} isAdmin={userProfile && userProfile.isAdmin} toggleFavorite={toggleFavorite} toggleEndorsement={toggleEndorsement} setEditingRecipe={setEditingRecipe} handleDeleteRecipe={handleDeleteRecipe} setSelectedRecipe={setSelectedRecipe} />
+          <RecipeDetailModal recipe={selectedRecipe} isVisible={!!selectedRecipe} onClose={() => setSelectedRecipe(null)} userId={userId} isAdmin={userProfile && userProfile.isAdmin} toggleFavorite={toggleFavorite} toggleEndorsement={toggleEndorsement} setEditingRecipe={setEditingRecipe} handleDeleteRecipe={handleDeleteRecipe} setSelectedRecipe={setSelectedRecipe} onEditClick={handleEditClick} />
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
-            {filteredRecipes.map(r => <RecipeCard key={r.id} recipe={r} userId={userId} isAdmin={userProfile && userProfile.isAdmin} isFavorite={favoriteRecipeIds.has(r.id)} toggleFavorite={toggleFavorite} toggleEndorsement={toggleEndorsement} setEditingRecipe={setEditingRecipe} handleDeleteRecipe={handleDeleteRecipe} setSelectedRecipe={setSelectedRecipe} />)}
+            {filteredRecipes.map(r => <RecipeCard key={r.id} recipe={r} userId={userId} isAdmin={userProfile && userProfile.isAdmin} isFavorite={favoriteRecipeIds.has(r.id)} toggleFavorite={toggleFavorite} toggleEndorsement={toggleEndorsement} onEditClick={handleEditClick} setEditingRecipe={setEditingRecipe} handleDeleteRecipe={handleDeleteRecipe} setSelectedRecipe={setSelectedRecipe} />)}
           </div>
         </main>
     </div>
