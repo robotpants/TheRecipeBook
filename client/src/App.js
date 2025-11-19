@@ -1,8 +1,18 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { initializeApp } from 'firebase/app';
-import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from 'firebase/auth';
+import { 
+  getAuth, 
+  signInAnonymously, 
+  signInWithPopup, 
+  GoogleAuthProvider, 
+  signOut, 
+  onAuthStateChanged,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  updateProfile
+} from 'firebase/auth';
 import { getFirestore, collection, onSnapshot, query, addDoc, setDoc, doc, deleteDoc, updateDoc, arrayUnion, arrayRemove, serverTimestamp, getDocs, writeBatch } from 'firebase/firestore';
-import { Camera, Image as ImageIcon, PlusCircle, Aperture, Search, Zap, UploadCloud, X, Settings, Bookmark, Star, BookOpen, MoreVertical, Edit, Trash2, Bug, AlertTriangle, Info } from 'lucide-react';
+import { Camera, Image as ImageIcon, PlusCircle, Aperture, Search, Zap, UploadCloud, X, Settings, Bookmark, Star, BookOpen, MoreVertical, Edit, Trash2, Bug, AlertTriangle, Info, LogOut, User, Mail, Lock, ChevronRight } from 'lucide-react';
 
 // --- CONFIGURATION ---
 const firebaseConfig = {
@@ -18,8 +28,7 @@ const firebaseConfig = {
 // ---------------------------------------
 // 1. CONSTANTS & DATA MODELS
 // ---------------------------------------
-const APP_VERSION = 'v0.1.000'; // Incremented per user request
-const appId = 'default-app-id';
+const APP_VERSION = 'v0.1.002';
 const RECIPES_COLLECTION_PATH = 'public_recipes'; 
 const SITE_TITLE = 'The Recipe Book'; 
 
@@ -108,7 +117,6 @@ const CORE_PARAMS_MAP = [
   { key: 'noiseReduction', genericLabel: 'Noise Reduction', labels: { 'Fujifilm': 'High ISO NR', 'Canon': 'High ISO NR', 'Nikon': 'High ISO NR', 'Sony': 'High ISO NR', 'Ricoh': 'High ISO NR', 'Olympus/OM System': 'Noise Filter' }},
   { key: 'clarity', genericLabel: 'Clarity', labels: { 'Fujifilm': 'Clarity', 'Canon': 'Clarity', 'Nikon': 'Clarity', 'Sony': 'Clarity', 'Ricoh': 'Clarity', 'Olympus/OM System': 'Midtones' }},
   
-  // --- BRAND SPECIFIC FIELDS ---
   { key: 'grainEffect', genericLabel: 'Grain Effect', supportedBrands: ['Fujifilm'], labels: { 'Fujifilm': 'Grain Effect' } },
   { key: 'chromeEffect', genericLabel: 'Color Chrome Effect', supportedBrands: ['Fujifilm'], labels: { 'Fujifilm': 'Color Chrome Effect' } },
   { key: 'chromeBlue', genericLabel: 'Color Chrome FX Blue', supportedBrands: ['Fujifilm'], labels: { 'Fujifilm': 'Color Chrome FX Blue' } },
@@ -126,52 +134,132 @@ const getLabelForBrand = (key, brand) => {
   return param.labels[brand] || param.genericLabel.split('/')[0].trim();
 };
 
-// Helper to check if a param should be shown for the current brand
 const isFieldVisible = (param, currentBrand) => {
-    if (!param.supportedBrands) return true; // Universal field
+    if (!param.supportedBrands) return true; 
     return param.supportedBrands.includes(currentBrand);
 };
 
-// --- UPDATED: Memory-safe image compression for iOS ---
 const compressImage = (file) => {
   return new Promise((resolve, reject) => {
     if (!file) return reject("No file provided");
-    
     const objectUrl = URL.createObjectURL(file);
     const img = new Image();
     img.src = objectUrl;
-    
     img.onload = () => {
       URL.revokeObjectURL(objectUrl);
-      
       const canvas = document.createElement('canvas');
       let width = img.width;
       let height = img.height;
-
-      if (width > IMAGE_CONFIG.maxWidth) {
-        height *= IMAGE_CONFIG.maxWidth / width;
-        width = IMAGE_CONFIG.maxWidth;
-      }
-
-      canvas.width = width;
-      canvas.height = height;
-      
+      if (width > IMAGE_CONFIG.maxWidth) { height *= IMAGE_CONFIG.maxWidth / width; width = IMAGE_CONFIG.maxWidth; }
+      canvas.width = width; canvas.height = height;
       const ctx = canvas.getContext('2d');
       ctx.drawImage(img, 0, 0, width, height);
-
       resolve(canvas.toDataURL(IMAGE_CONFIG.outputFormat, IMAGE_CONFIG.quality));
     };
-    
-    img.onerror = (err) => {
-        URL.revokeObjectURL(objectUrl);
-        reject("Image load failed.");
-    };
+    img.onerror = (err) => { URL.revokeObjectURL(objectUrl); reject("Image load failed."); };
   });
 };
 
 // ---------------------------------------
 // 2. SUB-COMPONENTS
 // ---------------------------------------
+
+// --- NEW: AUTH MODAL ---
+const AuthModal = ({ isVisible, onClose, auth, showCustomError }) => {
+    const [isSignUp, setIsSignUp] = useState(false);
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
+    const [name, setName] = useState('');
+    const [isLoading, setIsLoading] = useState(false);
+
+    if (!isVisible) return null;
+
+    const handleEmailAuth = async (e) => {
+        e.preventDefault();
+        setIsLoading(true);
+        try {
+            if (isSignUp) {
+                const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+                await updateProfile(userCredential.user, { displayName: name });
+                window.location.reload(); // Force reload to update UI state cleanly
+            } else {
+                await signInWithEmailAndPassword(auth, email, password);
+                onClose();
+            }
+        } catch (error) {
+            console.error(error);
+            showCustomError(error.message);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const handleGoogle = async () => {
+        const provider = new GoogleAuthProvider();
+        try {
+            await signInWithPopup(auth, provider);
+            onClose();
+        } catch (error) {
+            showCustomError(error.message);
+        }
+    };
+
+    return (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl overflow-hidden relative">
+                <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 p-2"><X className="w-5 h-5" /></button>
+                
+                <div className="p-8">
+                    <div className="text-center mb-8">
+                        <h2 className="text-2xl font-black text-gray-900">{isSignUp ? 'Create Account' : 'Welcome Back'}</h2>
+                        <p className="text-gray-500 text-sm mt-1">Save your recipes across all devices.</p>
+                    </div>
+
+                    {/* Google Button */}
+                    <button onClick={handleGoogle} className="w-full bg-white border border-gray-300 text-gray-700 font-bold py-3 rounded-xl flex items-center justify-center hover:bg-gray-50 transition mb-6">
+                        <User className="w-5 h-5 mr-2" /> Continue with Google
+                    </button>
+
+                    <div className="relative mb-6">
+                        <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-gray-200"></div></div>
+                        <div className="relative flex justify-center text-sm"><span className="px-2 bg-white text-gray-500">Or with email</span></div>
+                    </div>
+
+                    {/* Email Form */}
+                    <form onSubmit={handleEmailAuth} className="space-y-4">
+                        {isSignUp && (
+                            <div>
+                                <label className="block text-xs font-bold uppercase text-gray-500 tracking-wider mb-1">Display Name</label>
+                                <div className="relative"><User className="absolute left-3 top-3 text-gray-400 w-4 h-4" /><input type="text" value={name} onChange={(e) => setName(e.target.value)} className="w-full pl-10 py-2 border-gray-300 rounded-lg focus:ring-[#FF654F] focus:border-[#FF654F]" placeholder="Chef John" required /></div>
+                            </div>
+                        )}
+                        <div>
+                            <label className="block text-xs font-bold uppercase text-gray-500 tracking-wider mb-1">Email</label>
+                            <div className="relative"><Mail className="absolute left-3 top-3 text-gray-400 w-4 h-4" /><input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full pl-10 py-2 border-gray-300 rounded-lg focus:ring-[#FF654F] focus:border-[#FF654F]" placeholder="you@example.com" required /></div>
+                        </div>
+                        <div>
+                            <label className="block text-xs font-bold uppercase text-gray-500 tracking-wider mb-1">Password</label>
+                            <div className="relative"><Lock className="absolute left-3 top-3 text-gray-400 w-4 h-4" /><input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full pl-10 py-2 border-gray-300 rounded-lg focus:ring-[#FF654F] focus:border-[#FF654F]" placeholder="••••••••" required /></div>
+                        </div>
+
+                        <button type="submit" disabled={isLoading} className="w-full bg-[#FF654F] hover:bg-[#e05541] text-white font-bold py-3 rounded-xl transition flex items-center justify-center">
+                            {isLoading ? 'Processing...' : (isSignUp ? 'Create Account' : 'Sign In')} <ChevronRight className="w-4 h-4 ml-1" />
+                        </button>
+                    </form>
+
+                    <div className="mt-6 text-center">
+                        <p className="text-sm text-gray-600">
+                            {isSignUp ? 'Already have an account?' : 'Need an account?'}
+                            <button onClick={() => setIsSignUp(!isSignUp)} className="ml-1 font-bold text-[#FF654F] hover:underline">
+                                {isSignUp ? 'Sign In' : 'Sign Up'}
+                            </button>
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
 
 const AboutModal = ({ isVisible, onClose }) => {
     if (!isVisible) return null;
@@ -203,13 +291,9 @@ const RecipeDetailModal = ({ recipe, isVisible, onClose, userId, toggleFavorite,
     const isOwner = recipe.userId === userId;
     const isFavorite = recipe.isFavorite || false;
 
-    // Filter settings to only show what is relevant for this brand OR has a value
     const allSettings = CORE_PARAMS_MAP
         .filter(param => isFieldVisible(param, recipe.brand) && recipe[param.key])
-        .map(param => ({
-            key: param.key, label: getLabelForBrand(param.key, recipe.brand),
-            value: recipe[param.key], genericLabel: param.genericLabel,
-        }));
+        .map(param => ({ key: param.key, label: getLabelForBrand(param.key, recipe.brand), value: recipe[param.key], genericLabel: param.genericLabel }));
 
     return (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
@@ -250,10 +334,7 @@ const RecipeDetailModal = ({ recipe, isVisible, onClose, userId, toggleFavorite,
                         </div>
                     </div>
                     
-                    {/* NOTES HIDDEN: Code foundation preserved for future use
-                    {recipe.notes && <div className="lg:col-span-3 p-6 pt-0 border-t border-gray-100 lg:border-t-0"><h3 className="text-xl font-bold text-gray-800 mb-4 flex items-center"><Info className="w-5 h-5 mr-2 text-blue-500" />Creator Notes</h3><p className="text-sm text-gray-700 whitespace-pre-wrap">{recipe.notes}</p></div>}
-                    */}
-
+                    {/* NOTES HIDDEN */}
                 </div>
             </div>
         </div>
@@ -301,7 +382,6 @@ const RecipeCard = ({ recipe, userId, isFavorite, toggleFavorite, toggleEndorsem
   );
 };
 
-// --- UPDATED: STABLE INPUT ---
 const RecipeForm = ({ recipeData, isVisible, onClose, onSubmit, onInputChange, onBrandChange, onImageUpload, onClearImage, isProcessingImage, fileInputRef }) => {
     if (!isVisible) return null;
     const isEditing = !!recipeData.id;
@@ -396,14 +476,18 @@ function App() {
   const [db, setDb] = useState(null);
   const [auth, setAuth] = useState(null);
   const [userId, setUserId] = useState(null);
+  const [userProfile, setUserProfile] = useState(null); // Track Login Status
   const [recipes, setRecipes] = useState([]);
   const [favoriteRecipeIds, setFavoriteRecipeIds] = useState(new Set());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [isAuthReady, setIsAuthReady] = useState(false);
+  
   const [isFormVisible, setIsFormVisible] = useState(false);
   const [isDebugMenuOpen, setIsDebugMenuOpen] = useState(false);
-  const [isAboutOpen, setIsAboutOpen] = useState(false);
+  const [isAboutOpen, setIsAboutOpen] = useState(false); 
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false); // NEW
+
   const [newRecipe, setNewRecipe] = useState(initialFormState);
   const [editingRecipe, setEditingRecipe] = useState(null);
   const [selectedRecipe, setSelectedRecipe] = useState(null);
@@ -414,20 +498,42 @@ function App() {
 
   const showCustomError = (message) => { setError(message); setTimeout(() => setError(null), 5000); };
 
+  // --- AUTHENTICATION ---
   useEffect(() => {
     try {
       const app = initializeApp(firebaseConfig);
       const firestoreDb = getFirestore(app);
       const firebaseAuth = getAuth(app);
       setDb(firestoreDb); setAuth(firebaseAuth);
+      
       onAuthStateChanged(firebaseAuth, async (user) => {
-        if (!user) { try { const cred = await signInAnonymously(firebaseAuth); setUserId(cred.user.uid); } catch (e) { setError("Auth Failed"); } } 
-        else { setUserId(user.uid); }
+        if (user) {
+          setUserId(user.uid);
+          if (!user.isAnonymous) {
+              setUserProfile({ name: user.displayName || user.email, photo: user.photoURL });
+          } else {
+              setUserProfile(null); // Guest
+          }
+        } else {
+           try { const cred = await signInAnonymously(firebaseAuth); setUserId(cred.user.uid); setUserProfile(null); } 
+           catch (e) { setError("Auth Failed"); }
+        }
         setLoading(false); setIsAuthReady(true);
       });
     } catch (e) { console.error(e); setError("Initialization failed. Check Keys."); setLoading(false); setIsAuthReady(true); }
   }, []);
 
+  const handleSignOut = async () => {
+      if (!auth) return;
+      try {
+          await signOut(auth);
+          window.location.reload(); 
+      } catch (error) {
+          console.error(error);
+      }
+  };
+
+  // --- DATA FETCHING ---
   useEffect(() => {
     if (!db || !isAuthReady) return;
     const unsubscribe = onSnapshot(query(collection(db, RECIPES_COLLECTION_PATH)), (snapshot) => {
@@ -444,6 +550,7 @@ function App() {
     return () => unsubscribe();
   }, [db, isAuthReady, userId]);
 
+  // --- ACTIONS ---
   const toggleFavorite = async (recipeId, isFavorite) => {
     if (!db || !userId) return showCustomError("Auth required.");
     const ref = doc(db, `users/${userId}/favorites`, recipeId);
@@ -510,14 +617,11 @@ function App() {
   const handleImageUpload = async (e, inputRef) => {
     const file = e.target.files[0];
     if (!file) return;
-    
     setIsProcessingImage(true);
     try {
       const url = await compressImage(file);
       (editingRecipe ? setEditingRecipe : setNewRecipe)(prev => ({ ...prev, imageUrl: url }));
     } catch (e) { showCustomError("Image failed."); }
-    
-    // Clear the input value safely AFTER processing
     if (inputRef.current) inputRef.current.value = null;
     setIsProcessingImage(false);
   };
@@ -548,9 +652,24 @@ function App() {
           <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
             <div className="flex items-center"><div className="bg-[#FF654F] p-2 rounded-lg mr-3"><BookOpen className="w-5 h-5 text-white" /></div><h1 className="text-2xl font-black tracking-tight text-gray-900">{SITE_TITLE}</h1></div>
             <div className="flex space-x-3 items-center">
-               {/* ABOUT BUTTON */}
                <button onClick={() => setIsAboutOpen(true)} className="px-3 py-1 text-xs font-medium text-gray-500 bg-gray-100 hover:bg-gray-200 rounded-full transition" title="About">About</button>
-               {/* DEBUG BUTTON */}
+               
+               {/* AUTH BUTTONS */}
+               {userProfile ? (
+                   <div className="flex items-center space-x-2">
+                       {userProfile.photo ? (
+                           <img src={userProfile.photo} alt="User" className="w-8 h-8 rounded-full border border-gray-200" />
+                       ) : (
+                           <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-white font-bold text-xs">{userProfile.name?.[0]}</div>
+                       )}
+                       <button onClick={handleSignOut} className="p-2 rounded-full text-red-500 hover:bg-red-50 transition" title="Sign Out"><LogOut className="w-5 h-5" /></button>
+                   </div>
+               ) : (
+                   <button onClick={() => setIsAuthModalOpen(true)} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-full transition flex items-center">
+                       <User className="w-3 h-3 mr-2" /> Sign In
+                   </button>
+               )}
+               
                <button onClick={() => setIsDebugMenuOpen(true)} className="p-2 rounded-full text-gray-700 hover:bg-gray-100 transition"><Settings className="w-5 h-5" /></button>
                <button onClick={() => {setEditingRecipe(null); setIsFormVisible(true);}} className="bg-gray-900 text-white px-4 py-2 rounded-full text-sm font-semibold hover:bg-gray-800 transition flex items-center shadow-md"><PlusCircle className="w-4 h-4 mr-2" />New Recipe</button>
             </div>
@@ -569,6 +688,7 @@ function App() {
           <RecipeForm recipeData={editingRecipe || newRecipe} isVisible={isFormVisible} onClose={() => {setNewRecipe(initialFormState); setEditingRecipe(null); setIsFormVisible(false);}} onSubmit={handleFormSubmit} onInputChange={handleInputChange} onBrandChange={handleBrandChange} onImageUpload={handleImageUpload} onClearImage={() => (editingRecipe ? setEditingRecipe : setNewRecipe)(prev => ({ ...prev, imageUrl: '' }))} isProcessingImage={isProcessingImage} fileInputRef={fileInputRef} />
           <DebugScreen isVisible={isDebugMenuOpen} onClose={() => setIsDebugMenuOpen(false)} handleDeleteAllRecipes={handleDeleteAllRecipes} userId={userId} />
           <AboutModal isVisible={isAboutOpen} onClose={() => setIsAboutOpen(false)} />
+          <AuthModal isVisible={isAuthModalOpen} onClose={() => setIsAuthModalOpen(false)} auth={auth} showCustomError={showCustomError} />
           <RecipeDetailModal recipe={selectedRecipe} isVisible={!!selectedRecipe} onClose={() => setSelectedRecipe(null)} userId={userId} toggleFavorite={toggleFavorite} toggleEndorsement={toggleEndorsement} setEditingRecipe={setEditingRecipe} handleDeleteRecipe={handleDeleteRecipe} setSelectedRecipe={setSelectedRecipe} />
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
             {filteredRecipes.map(r => <RecipeCard key={r.id} recipe={r} userId={userId} isFavorite={favoriteRecipeIds.has(r.id)} toggleFavorite={toggleFavorite} toggleEndorsement={toggleEndorsement} setEditingRecipe={setEditingRecipe} handleDeleteRecipe={handleDeleteRecipe} setSelectedRecipe={setSelectedRecipe} />)}
