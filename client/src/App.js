@@ -95,6 +95,7 @@ const BRAND_MODELS = {
 
 const IMAGE_CONFIG = { maxWidth: 800, quality: 0.75, maxInputSizeMB: 10, outputFormat: 'image/jpeg' };
 
+// --- UPDATED: BRAND AWARENESS IN PARAMS ---
 const CORE_PARAMS_MAP = [
   { key: 'baseProfile', genericLabel: 'Base Profile / Simulation', labels: { 'Fujifilm': 'Film Simulation', 'Canon': 'Picture Style', 'Nikon': 'Picture Control', 'Sony': 'Creative Style / Look', 'Ricoh': 'Image Control', 'Olympus/OM System': 'Picture Mode' }},
   { key: 'dynamicRange', genericLabel: 'Dynamic Range', labels: { 'Fujifilm': 'DR Setting', 'Canon': 'ALO', 'Nikon': 'ADL', 'Sony': 'DRO / HDR', 'Ricoh': 'DR Comp.', 'Olympus/OM System': 'Gradation' }},
@@ -131,27 +132,44 @@ const isFieldVisible = (param, currentBrand) => {
     return param.supportedBrands.includes(currentBrand);
 };
 
+// --- UPDATED: Memory-safe image compression for iOS ---
 const compressImage = (file) => {
   return new Promise((resolve, reject) => {
     if (!file) return reject("No file provided");
-    const reader = new FileReader();
-    reader.readAsDataURL(file);
-    reader.onload = (event) => {
-      const img = new Image();
-      img.src = event.target.result;
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        let width = img.width;
-        let height = img.height;
-        if (width > IMAGE_CONFIG.maxWidth) { height *= IMAGE_CONFIG.maxWidth / width; width = IMAGE_CONFIG.maxWidth; }
-        canvas.width = width; canvas.height = height;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0, width, height);
-        resolve(canvas.toDataURL(IMAGE_CONFIG.outputFormat, IMAGE_CONFIG.quality));
-      };
-      img.onerror = (err) => reject("Image load failed: " + err);
+    
+    // 1. Use createObjectURL (Pointer) instead of FileReader (Load into Memory)
+    // This is crucial for mobile Safari stability
+    const objectUrl = URL.createObjectURL(file);
+    const img = new Image();
+    img.src = objectUrl;
+    
+    img.onload = () => {
+      // 2. Free memory immediately
+      URL.revokeObjectURL(objectUrl);
+      
+      const canvas = document.createElement('canvas');
+      let width = img.width;
+      let height = img.height;
+
+      if (width > IMAGE_CONFIG.maxWidth) {
+        height *= IMAGE_CONFIG.maxWidth / width;
+        width = IMAGE_CONFIG.maxWidth;
+      }
+
+      canvas.width = width;
+      canvas.height = height;
+      
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, width, height);
+
+      // 3. Output compressed string
+      resolve(canvas.toDataURL(IMAGE_CONFIG.outputFormat, IMAGE_CONFIG.quality));
     };
-    reader.onerror = (err) => reject("File read failed: " + err);
+    
+    img.onerror = (err) => {
+        URL.revokeObjectURL(objectUrl);
+        reject("Image load failed. Try a smaller image or JPG format.");
+    };
   });
 };
 
@@ -208,6 +226,7 @@ const RecipeDetailModal = ({ recipe, isVisible, onClose, userId, toggleFavorite,
                     </div>
                     <div className="lg:col-span-2 p-6">
                         <h3 className="text-xl font-bold text-gray-800 mb-4 flex items-center"><Aperture className="w-5 h-5 mr-2 text-[#FF654F]" />Full Settings List</h3>
+                        {/* CHANGED: Using grid-cols-2 md:grid-cols-3 for denser packing on desktop */}
                         <div className="grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-6">
                             {allSettings.map(setting => (<div key={setting.key}><p className="text-xs font-bold uppercase text-gray-500 tracking-wider mb-0.5">{setting.label}</p><p className="text-lg font-mono font-medium text-gray-900">{setting.value}</p></div>))}
                         </div>
