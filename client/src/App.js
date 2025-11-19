@@ -12,7 +12,7 @@ import {
   updateProfile
 } from 'firebase/auth';
 import { getFirestore, collection, onSnapshot, query, addDoc, setDoc, doc, deleteDoc, updateDoc, arrayUnion, arrayRemove, serverTimestamp, getDocs, writeBatch } from 'firebase/firestore';
-import { Camera, Image as ImageIcon, PlusCircle, Aperture, Search, Zap, UploadCloud, X, Settings, Bookmark, Star, BookOpen, MoreVertical, Edit, Trash2, Bug, AlertTriangle, Info, LogOut, User, Mail, Lock, ChevronRight, Shield, Flame, Rocket } from 'lucide-react';
+import { Camera, Image as ImageIcon, PlusCircle, Aperture, Search, Zap, UploadCloud, X, Settings, Bookmark, MoreVertical, Edit, Trash2, Bug, AlertTriangle, Info, LogOut, User, Mail, Lock, ChevronRight, Shield, Flame, Rocket } from 'lucide-react';
 
 // --- CONFIGURATION ---
 const firebaseConfig = {
@@ -28,7 +28,7 @@ const firebaseConfig = {
 // ---------------------------------------
 // 1. CONSTANTS & DATA MODELS
 // ---------------------------------------
-const APP_VERSION = 'v0.1.014';
+const APP_VERSION = 'v0.1.014'; 
 const RECIPES_COLLECTION_PATH = 'public_recipes'; 
 const SITE_TITLE = 'The Recipe Book'; 
 
@@ -163,6 +163,12 @@ const getLabelForBrand = (key, brand) => {
 const isFieldVisible = (param, currentBrand) => {
     if (!param.supportedBrands) return true; 
     return param.supportedBrands.includes(currentBrand);
+};
+
+// --- UI HELPERS ---
+const formatBrandName = (brand) => {
+    if (brand === 'Olympus/OM System') return 'Olympus/OM';
+    return brand;
 };
 
 const compressImage = (file) => {
@@ -328,7 +334,8 @@ const RecipeDetailModal = ({ recipe, isVisible, onClose, userId, isAdmin, toggle
                     <div className='flex-1 pr-6'>
                         <h2 className="text-3xl font-black text-gray-900 leading-tight mb-1">{recipe.name}</h2>
                         <p className="text-md font-medium text-gray-600 flex items-center mt-2">
-                            <Camera className="w-4 h-4 mr-2 text-gray-500" /> {recipe.brand} &bull; {recipe.model || 'All Models'}
+                            {/* STEP 1: formatBrandName */}
+                            <Camera className="w-4 h-4 mr-2 text-gray-500" /> {formatBrandName(recipe.brand)} &bull; {recipe.model || 'All Models'}
                         </p>
                     </div>
                     <div className="flex space-x-3 items-center">
@@ -401,7 +408,8 @@ const RecipeCard = ({ recipe, userId, isAdmin, isFavorite, toggleFavorite, toggl
             {canModify && (<div ref={menuRef} className="relative"><button onClick={(e) => { e.stopPropagation(); setIsMenuOpen(!isMenuOpen); }} className="p-2 rounded-full bg-white text-gray-400 hover:text-gray-600 shadow-md transition-all"><MoreVertical className="w-4 h-4" /></button>{isMenuOpen && (<div className="absolute right-0 top-10 w-32 bg-white rounded-lg shadow-xl overflow-hidden z-30 border border-gray-100"><button onClick={(e) => {e.stopPropagation(); setEditingRecipe(recipe); setIsMenuOpen(false);}} className="flex items-center w-full px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 transition"><Edit className="w-4 h-4 mr-2 text-blue-500" /> Edit</button><button onClick={(e) => {e.stopPropagation(); handleDeleteRecipe(recipe.id, recipe.name); setIsMenuOpen(false);}} className="flex items-center w-full px-3 py-2 text-sm text-red-600 hover:bg-red-50 transition"><Trash2 className="w-4 h-4 mr-2" /> Delete</button></div>)}</div>)}
         </div>
 
-        <div className="absolute top-3 left-3 bg-white/90 backdrop-blur px-3 py-1 rounded-full text-xs font-bold text-gray-700 shadow-sm border border-gray-100">{recipe.brand}</div>
+        {/* STEP 1: formatBrandName used here to fix visual overflow for older data */}
+        <div className="absolute top-3 left-3 bg-white/90 backdrop-blur px-3 py-1 rounded-full text-xs font-bold text-gray-700 shadow-sm border border-gray-100">{formatBrandName(recipe.brand)}</div>
       </div>
       <div className="p-5 flex-1 flex flex-col">
         <div className="mb-4 border-b border-gray-100 pb-3">
@@ -807,7 +815,7 @@ function App() {
             <div className="relative flex-1"><Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" /><input type="text" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder="Search recipes..." className="w-full pl-12 pr-4 py-3 rounded-xl border-none bg-white shadow-sm focus:ring-2 focus:ring-[#FF654F]" /></div>
             <div className="flex gap-2 overflow-x-auto pb-2 md:pb-0 hide-scrollbar">
               <button onClick={() => setFilterBrand('All')} className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap ${filterBrand === 'All' ? 'bg-gray-800 text-white' : 'bg-white text-gray-600'}`}>All Brands</button>
-              {ALL_BRANDS.map(b => <button key={b} onClick={() => setFilterBrand(b)} className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap ${filterBrand === b ? 'bg-[#FF654F] text-white' : 'bg-white text-gray-600'}`}>{b}</button>)}
+              {ALL_BRANDS.map(b => <button key={b} onClick={() => setFilterBrand(b)} className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap ${filterBrand === b ? 'bg-[#FF654F] text-white' : 'bg-white text-gray-600'} shrink-0`}>{b}</button>)}
               <button onClick={() => setFilterBrand('Favorites')} className={`flex items-center px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap ${filterBrand === 'Favorites' ? 'bg-gray-800 text-white' : 'bg-white text-gray-600'}`}><Bookmark className="w-4 h-4 mr-1.5" />Bookmarks</button>
             </div>
           </div>
