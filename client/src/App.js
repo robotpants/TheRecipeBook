@@ -18,6 +18,7 @@ const firebaseConfig = {
 // ---------------------------------------
 // 1. CONSTANTS & DATA MODELS
 // ---------------------------------------
+const APP_VERSION = 'v0.1.000'; // Incremented per user request
 const appId = 'default-app-id';
 const RECIPES_COLLECTION_PATH = 'public_recipes'; 
 const SITE_TITLE = 'The Recipe Book'; 
@@ -125,35 +126,75 @@ const getLabelForBrand = (key, brand) => {
   return param.labels[brand] || param.genericLabel.split('/')[0].trim();
 };
 
+// Helper to check if a param should be shown for the current brand
 const isFieldVisible = (param, currentBrand) => {
-    if (!param.supportedBrands) return true; 
+    if (!param.supportedBrands) return true; // Universal field
     return param.supportedBrands.includes(currentBrand);
 };
 
+// --- UPDATED: Memory-safe image compression for iOS ---
 const compressImage = (file) => {
   return new Promise((resolve, reject) => {
     if (!file) return reject("No file provided");
+    
     const objectUrl = URL.createObjectURL(file);
     const img = new Image();
     img.src = objectUrl;
+    
     img.onload = () => {
       URL.revokeObjectURL(objectUrl);
+      
       const canvas = document.createElement('canvas');
       let width = img.width;
       let height = img.height;
-      if (width > IMAGE_CONFIG.maxWidth) { height *= IMAGE_CONFIG.maxWidth / width; width = IMAGE_CONFIG.maxWidth; }
-      canvas.width = width; canvas.height = height;
+
+      if (width > IMAGE_CONFIG.maxWidth) {
+        height *= IMAGE_CONFIG.maxWidth / width;
+        width = IMAGE_CONFIG.maxWidth;
+      }
+
+      canvas.width = width;
+      canvas.height = height;
+      
       const ctx = canvas.getContext('2d');
       ctx.drawImage(img, 0, 0, width, height);
+
       resolve(canvas.toDataURL(IMAGE_CONFIG.outputFormat, IMAGE_CONFIG.quality));
     };
-    img.onerror = (err) => { URL.revokeObjectURL(objectUrl); reject("Image load failed."); };
+    
+    img.onerror = (err) => {
+        URL.revokeObjectURL(objectUrl);
+        reject("Image load failed.");
+    };
   });
 };
 
 // ---------------------------------------
 // 2. SUB-COMPONENTS
 // ---------------------------------------
+
+const AboutModal = ({ isVisible, onClose }) => {
+    if (!isVisible) return null;
+    return (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden relative">
+                <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 p-2 hover:bg-gray-100 rounded-full transition"><X className="w-5 h-5" /></button>
+                <div className="p-8 text-center">
+                    <div className="mx-auto bg-[#FF654F]/10 w-16 h-16 rounded-full flex items-center justify-center mb-4">
+                        <BookOpen className="w-8 h-8 text-[#FF654F]" />
+                    </div>
+                    <h2 className="text-2xl font-black text-gray-900 mb-2">Recipes for All</h2>
+                    <p className="text-gray-600 leading-relaxed text-sm">
+                        From which we spring ship of the imagination inconspicuous motes of rock and gas emerged into consciousness rings of Uranus quasar. Star stuff harvesting star light muse about something incredible is waiting to be known citizens of distant epochs laws of physics hydrogen atoms.
+                    </p>
+                </div>
+                <div className="p-4 bg-gray-50 border-t border-gray-100 text-center">
+                     <p className="text-xs text-gray-400">{APP_VERSION} • The Recipe Book</p>
+                </div>
+            </div>
+        </div>
+    );
+};
 
 const RecipeDetailModal = ({ recipe, isVisible, onClose, userId, toggleFavorite, toggleEndorsement, setEditingRecipe, handleDeleteRecipe }) => {
     if (!isVisible || !recipe) return null;
@@ -162,9 +203,13 @@ const RecipeDetailModal = ({ recipe, isVisible, onClose, userId, toggleFavorite,
     const isOwner = recipe.userId === userId;
     const isFavorite = recipe.isFavorite || false;
 
+    // Filter settings to only show what is relevant for this brand OR has a value
     const allSettings = CORE_PARAMS_MAP
         .filter(param => isFieldVisible(param, recipe.brand) && recipe[param.key])
-        .map(param => ({ key: param.key, label: getLabelForBrand(param.key, recipe.brand), value: recipe[param.key], genericLabel: param.genericLabel }));
+        .map(param => ({
+            key: param.key, label: getLabelForBrand(param.key, recipe.brand),
+            value: recipe[param.key], genericLabel: param.genericLabel,
+        }));
 
     return (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
@@ -172,7 +217,9 @@ const RecipeDetailModal = ({ recipe, isVisible, onClose, userId, toggleFavorite,
                 <div className="flex justify-between items-start p-6 border-b border-gray-100 bg-gray-50/50">
                     <div className='flex-1 pr-6'>
                         <h2 className="text-3xl font-black text-gray-900 leading-tight mb-1">{recipe.name}</h2>
-                        <p className="text-md font-medium text-gray-600 flex items-center mt-2"><Camera className="w-4 h-4 mr-2 text-gray-500" /> {recipe.brand} &bull; {recipe.model || 'All Models'}</p>
+                        <p className="text-md font-medium text-gray-600 flex items-center mt-2">
+                            <Camera className="w-4 h-4 mr-2 text-gray-500" /> {recipe.brand} &bull; {recipe.model || 'All Models'}
+                        </p>
                     </div>
                     <div className="flex space-x-3 items-center">
                         {isOwner && ( <>
@@ -188,8 +235,12 @@ const RecipeDetailModal = ({ recipe, isVisible, onClose, userId, toggleFavorite,
                             {recipe.imageUrl ? <img src={recipe.imageUrl} alt={recipe.name} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center bg-gray-100 text-gray-300"><ImageIcon className="w-10 h-10" /></div>}
                         </div>
                         <div className="flex w-full space-x-3 mt-auto">
-                            <button onClick={() => toggleFavorite(recipe.id, isFavorite)} className={`flex-1 flex items-center justify-center px-4 py-3 rounded-lg text-sm font-semibold transition-all ${isFavorite ? 'bg-[#FF654F] text-white' : 'bg-gray-100 text-gray-700 hover:bg-[#FF654F]/20'}`}><Bookmark className={`w-4 h-4 mr-2 ${isFavorite ? 'fill-white' : 'fill-gray-600'}`} /> {isFavorite ? 'Bookmarked' : 'Bookmark'}</button>
-                            <button onClick={() => toggleEndorsement(recipe.id, isEndorsed)} className={`flex-1 flex items-center justify-center px-4 py-3 rounded-lg text-sm font-semibold transition-all ${isEndorsed ? 'bg-yellow-500 text-white' : 'bg-gray-100 text-gray-700 hover:bg-yellow-100'}`}><Star className={`w-4 h-4 mr-2 ${isEndorsed ? 'fill-white' : 'fill-gray-500'}`} /> Endorse ({endorsementCount})</button>
+                            <button onClick={() => toggleFavorite(recipe.id, isFavorite)} className={`flex-1 flex items-center justify-center px-4 py-3 rounded-lg text-sm font-semibold transition-all ${isFavorite ? 'bg-[#FF654F] text-white' : 'bg-gray-100 text-gray-700 hover:bg-[#FF654F]/20'}`}>
+                                <Bookmark className={`w-4 h-4 mr-2 ${isFavorite ? 'fill-white' : 'fill-gray-600'}`} /> {isFavorite ? 'Bookmarked' : 'Bookmark'}
+                            </button>
+                            <button onClick={() => toggleEndorsement(recipe.id, isEndorsed)} className={`flex-1 flex items-center justify-center px-4 py-3 rounded-lg text-sm font-semibold transition-all ${isEndorsed ? 'bg-yellow-500 text-white' : 'bg-gray-100 text-gray-700 hover:bg-yellow-100'}`}>
+                                <Star className={`w-4 h-4 mr-2 ${isEndorsed ? 'fill-white' : 'fill-gray-500'}`} /> Endorse ({endorsementCount})
+                            </button>
                         </div>
                     </div>
                     <div className="lg:col-span-2 p-6">
@@ -198,6 +249,11 @@ const RecipeDetailModal = ({ recipe, isVisible, onClose, userId, toggleFavorite,
                             {allSettings.map(setting => (<div key={setting.key}><p className="text-xs font-bold uppercase text-gray-500 tracking-wider mb-0.5">{setting.label}</p><p className="text-lg font-mono font-medium text-gray-900">{setting.value}</p></div>))}
                         </div>
                     </div>
+                    
+                    {/* NOTES HIDDEN: Code foundation preserved for future use
+                    {recipe.notes && <div className="lg:col-span-3 p-6 pt-0 border-t border-gray-100 lg:border-t-0"><h3 className="text-xl font-bold text-gray-800 mb-4 flex items-center"><Info className="w-5 h-5 mr-2 text-blue-500" />Creator Notes</h3><p className="text-sm text-gray-700 whitespace-pre-wrap">{recipe.notes}</p></div>}
+                    */}
+
                 </div>
             </div>
         </div>
@@ -239,12 +295,13 @@ const RecipeCard = ({ recipe, userId, isFavorite, toggleFavorite, toggleEndorsem
           {settingsWithValues.slice(0, 6).map((param) => (<div key={param.key} className="flex flex-col"><span className="font-semibold text-gray-500 text-[10px] uppercase tracking-wider">{getLabelForBrand(param.key, recipe.brand)}</span><span className="text-[#FF654F] font-medium font-mono truncate" title={recipe[param.key]}>{recipe[param.key]}</span></div>))}
           {settingsWithValues.length > 6 && (<div className="col-span-2 text-center pt-2"><span className="text-xs text-gray-400 italic">+{settingsWithValues.length - 6} more settings</span></div>)}
         </div>
+        {/* NOTES HIDDEN */}
       </div>
     </div>
   );
 };
 
-// --- UPDATED: STABLE INPUT (Fixes "Double Select" bug) ---
+// --- UPDATED: STABLE INPUT ---
 const RecipeForm = ({ recipeData, isVisible, onClose, onSubmit, onInputChange, onBrandChange, onImageUpload, onClearImage, isProcessingImage, fileInputRef }) => {
     if (!isVisible) return null;
     const isEditing = !!recipeData.id;
@@ -257,10 +314,7 @@ const RecipeForm = ({ recipeData, isVisible, onClose, onSubmit, onInputChange, o
                 </div>
                 <form onSubmit={onSubmit} className="p-6 max-h-[80vh] overflow-y-auto">
                     <div className="mb-8">
-                        {/* KEY FIX: The file input is now OUTSIDE the conditional rendering. It always exists, just hidden or absolute. */}
                         <div className={`border-2 border-dashed rounded-xl flex flex-col items-center justify-center relative overflow-hidden h-48 bg-gray-50 ${recipeData.imageUrl ? 'border-[#FF654F]' : 'border-gray-300 hover:border-[#FF654F]'}`}>
-                            
-                            {/* 1. The Invisible Touch Target (Always on top) */}
                             {!isProcessingImage && !recipeData.imageUrl && (
                                 <input 
                                     type="file" 
@@ -268,13 +322,10 @@ const RecipeForm = ({ recipeData, isVisible, onClose, onSubmit, onInputChange, o
                                     accept="image/*" 
                                     onChange={(e) => {
                                         onImageUpload(e, fileInputRef);
-                                        // We clear value inside handleImageUpload, but doubling up here helps specific browser quirks
                                     }} 
                                     className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" 
                                 />
                             )}
-
-                            {/* 2. The Visuals (Behind the input) */}
                             {isProcessingImage ? (
                                 <div className="text-[#FF654F] flex flex-col items-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#FF654F] mb-2"></div><span className="text-xs font-medium">Compressing...</span></div>
                             ) : recipeData.imageUrl ? (
@@ -318,6 +369,7 @@ const RecipeForm = ({ recipeData, isVisible, onClose, onSubmit, onInputChange, o
                             })}
                         </div>
                     </div>
+                    {/* NOTES HIDDEN */}
                     <button type="submit" className="w-full py-4 bg-[#FF654F] hover:bg-red-500 text-white rounded-xl font-bold shadow-lg transform transition hover:-translate-y-0.5 flex justify-center items-center">{isEditing ? <Edit className="w-5 h-5 mr-2" /> : <PlusCircle className="w-5 h-5 mr-2" />}{isEditing ? 'Update Recipe' : 'Publish Recipe'}</button>
                 </form>
             </div>
@@ -351,6 +403,7 @@ function App() {
   const [isAuthReady, setIsAuthReady] = useState(false);
   const [isFormVisible, setIsFormVisible] = useState(false);
   const [isDebugMenuOpen, setIsDebugMenuOpen] = useState(false);
+  const [isAboutOpen, setIsAboutOpen] = useState(false);
   const [newRecipe, setNewRecipe] = useState(initialFormState);
   const [editingRecipe, setEditingRecipe] = useState(null);
   const [selectedRecipe, setSelectedRecipe] = useState(null);
@@ -495,6 +548,9 @@ function App() {
           <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
             <div className="flex items-center"><div className="bg-[#FF654F] p-2 rounded-lg mr-3"><BookOpen className="w-5 h-5 text-white" /></div><h1 className="text-2xl font-black tracking-tight text-gray-900">{SITE_TITLE}</h1></div>
             <div className="flex space-x-3 items-center">
+               {/* ABOUT BUTTON */}
+               <button onClick={() => setIsAboutOpen(true)} className="px-3 py-1 text-xs font-medium text-gray-500 bg-gray-100 hover:bg-gray-200 rounded-full transition" title="About">About</button>
+               {/* DEBUG BUTTON */}
                <button onClick={() => setIsDebugMenuOpen(true)} className="p-2 rounded-full text-gray-700 hover:bg-gray-100 transition"><Settings className="w-5 h-5" /></button>
                <button onClick={() => {setEditingRecipe(null); setIsFormVisible(true);}} className="bg-gray-900 text-white px-4 py-2 rounded-full text-sm font-semibold hover:bg-gray-800 transition flex items-center shadow-md"><PlusCircle className="w-4 h-4 mr-2" />New Recipe</button>
             </div>
@@ -512,7 +568,8 @@ function App() {
           </div>
           <RecipeForm recipeData={editingRecipe || newRecipe} isVisible={isFormVisible} onClose={() => {setNewRecipe(initialFormState); setEditingRecipe(null); setIsFormVisible(false);}} onSubmit={handleFormSubmit} onInputChange={handleInputChange} onBrandChange={handleBrandChange} onImageUpload={handleImageUpload} onClearImage={() => (editingRecipe ? setEditingRecipe : setNewRecipe)(prev => ({ ...prev, imageUrl: '' }))} isProcessingImage={isProcessingImage} fileInputRef={fileInputRef} />
           <DebugScreen isVisible={isDebugMenuOpen} onClose={() => setIsDebugMenuOpen(false)} handleDeleteAllRecipes={handleDeleteAllRecipes} userId={userId} />
-          <RecipeDetailModal recipe={selectedRecipe} isVisible={!!selectedRecipe} onClose={() => setSelectedRecipe(null)} userId={userId} toggleFavorite={toggleFavorite} toggleEndorsement={toggleEndorsement} setEditingRecipe={setEditingRecipe} handleDeleteRecipe={handleDeleteRecipe} />
+          <AboutModal isVisible={isAboutOpen} onClose={() => setIsAboutOpen(false)} />
+          <RecipeDetailModal recipe={selectedRecipe} isVisible={!!selectedRecipe} onClose={() => setSelectedRecipe(null)} userId={userId} toggleFavorite={toggleFavorite} toggleEndorsement={toggleEndorsement} setEditingRecipe={setEditingRecipe} handleDeleteRecipe={handleDeleteRecipe} setSelectedRecipe={setSelectedRecipe} />
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
             {filteredRecipes.map(r => <RecipeCard key={r.id} recipe={r} userId={userId} isFavorite={favoriteRecipeIds.has(r.id)} toggleFavorite={toggleFavorite} toggleEndorsement={toggleEndorsement} setEditingRecipe={setEditingRecipe} handleDeleteRecipe={handleDeleteRecipe} setSelectedRecipe={setSelectedRecipe} />)}
           </div>
