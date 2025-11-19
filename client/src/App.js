@@ -28,7 +28,7 @@ const firebaseConfig = {
 // ---------------------------------------
 // 1. CONSTANTS & DATA MODELS
 // ---------------------------------------
-const APP_VERSION = 'v0.1.008';
+const APP_VERSION = 'v0.1.009';
 const RECIPES_COLLECTION_PATH = 'public_recipes'; 
 const SITE_TITLE = 'The Recipe Book'; 
 
@@ -211,18 +211,22 @@ const AuthModal = ({ isVisible, onClose, auth, showCustomError }) => {
         <div className="fixed inset-0 z-50 overflow-y-auto bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
             <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl overflow-hidden relative">
                 <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 p-2"><X className="w-5 h-5" /></button>
+                
                 <div className="p-8">
                     <div className="text-center mb-8">
                         <h2 className="text-2xl font-black text-gray-900">{isSignUp ? 'Create Account' : 'Welcome Back'}</h2>
                         <p className="text-gray-500 text-sm mt-1">Save your recipes across all devices.</p>
                     </div>
+
                     <button onClick={handleGoogle} className="w-full bg-white border border-gray-300 text-gray-700 font-bold py-3 rounded-xl flex items-center justify-center hover:bg-gray-50 transition mb-6">
                         <User className="w-5 h-5 mr-2" /> Continue with Google
                     </button>
+
                     <div className="relative mb-6">
                         <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-gray-200"></div></div>
                         <div className="relative flex justify-center text-sm"><span className="px-2 bg-white text-gray-500">Or with email</span></div>
                     </div>
+
                     <form onSubmit={handleEmailAuth} className="space-y-4">
                         {isSignUp && (
                             <div>
@@ -238,12 +242,19 @@ const AuthModal = ({ isVisible, onClose, auth, showCustomError }) => {
                             <label className="block text-xs font-bold uppercase text-gray-500 tracking-wider mb-1">Password</label>
                             <div className="relative"><Lock className="absolute left-3 top-3 text-gray-400 w-4 h-4" /><input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full pl-10 py-2 border-gray-300 rounded-lg focus:ring-[#FF654F] focus:border-[#FF654F]" placeholder="••••••••" required /></div>
                         </div>
+
                         <button type="submit" disabled={isLoading} className="w-full bg-[#FF654F] hover:bg-[#e05541] text-white font-bold py-3 rounded-xl transition flex items-center justify-center">
                             {isLoading ? 'Processing...' : (isSignUp ? 'Create Account' : 'Sign In')} <ChevronRight className="w-4 h-4 ml-1" />
                         </button>
                     </form>
+
                     <div className="mt-6 text-center">
-                        <p className="text-sm text-gray-600">{isSignUp ? 'Already have an account?' : 'Need an account?'} <button onClick={() => setIsSignUp(!isSignUp)} className="ml-1 font-bold text-[#FF654F] hover:underline">{isSignUp ? 'Sign In' : 'Sign Up'}</button></p>
+                        <p className="text-sm text-gray-600">
+                            {isSignUp ? 'Already have an account?' : 'Need an account?'}
+                            <button onClick={() => setIsSignUp(!isSignUp)} className="ml-1 font-bold text-[#FF654F] hover:underline">
+                                {isSignUp ? 'Sign In' : 'Sign Up'}
+                            </button>
+                        </p>
                     </div>
                 </div>
             </div>
@@ -280,8 +291,9 @@ const RecipeDetailModal = ({ recipe, isVisible, onClose, userId, isAdmin, toggle
     const endorsementCount = recipe.endorserIds?.length || 0;
     const isOwner = recipe.userId === userId;
     const isFavorite = recipe.isFavorite || false;
-    // ✅ ADMIN POWER: Can edit/delete if Owner OR Admin
-    const canModify = isOwner || isAdmin;
+
+    // ✅ ADMIN LOGIC: Admin always has modify rights, or if you are owner
+    const canModify = isAdmin || isOwner;
 
     const allSettings = CORE_PARAMS_MAP
         .filter(param => isFieldVisible(param, recipe.brand) && recipe[param.key])
@@ -325,6 +337,7 @@ const RecipeDetailModal = ({ recipe, isVisible, onClose, userId, isAdmin, toggle
                             {allSettings.map(setting => (<div key={setting.key}><p className="text-xs font-bold uppercase text-gray-500 tracking-wider mb-0.5">{setting.label}</p><p className="text-lg font-mono font-medium text-gray-900">{setting.value}</p></div>))}
                         </div>
                     </div>
+                    {/* NOTES HIDDEN */}
                 </div>
             </div>
         </div>
@@ -337,8 +350,8 @@ const RecipeCard = ({ recipe, userId, isAdmin, isFavorite, toggleFavorite, toggl
   const endorsementCount = recipe.endorserIds?.length || 0;
   
   // ✅ ADMIN POWER: Can edit/delete if Owner OR Admin
-  const isOwner = recipe.userId && recipe.userId === userId; 
-  const canModify = isOwner || isAdmin;
+  const isOwner = recipe.userId && recipe.userId === userId;
+  const canModify = isAdmin || isOwner;
 
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const menuRef = useRef(null);
@@ -377,6 +390,7 @@ const RecipeCard = ({ recipe, userId, isAdmin, isFavorite, toggleFavorite, toggl
           {settingsWithValues.slice(0, 6).map((param) => (<div key={param.key} className="flex flex-col"><span className="font-semibold text-gray-500 text-[10px] uppercase tracking-wider">{getLabelForBrand(param.key, recipe.brand)}</span><span className="text-[#FF654F] font-medium font-mono truncate" title={recipe[param.key]}>{recipe[param.key]}</span></div>))}
           {settingsWithValues.length > 6 && (<div className="col-span-2 text-center pt-2"><span className="text-xs text-gray-400 italic">+{settingsWithValues.length - 6} more settings</span></div>)}
         </div>
+        {/* NOTES HIDDEN */}
       </div>
     </div>
   );
@@ -450,6 +464,7 @@ const RecipeForm = ({ recipeData, isVisible, onClose, onSubmit, onInputChange, o
                             })}
                         </div>
                     </div>
+                    {/* NOTES HIDDEN */}
                     <button type="submit" className="w-full py-4 bg-[#FF654F] hover:bg-red-500 text-white rounded-xl font-bold shadow-lg transform transition hover:-translate-y-0.5 flex justify-center items-center">{isEditing ? <Edit className="w-5 h-5 mr-2" /> : <PlusCircle className="w-5 h-5 mr-2" />}{isEditing ? 'Update Recipe' : 'Publish Recipe'}</button>
                 </form>
             </div>
@@ -457,6 +472,7 @@ const RecipeForm = ({ recipeData, isVisible, onClose, onSubmit, onInputChange, o
     );
 };
 
+// --- UPDATED: NUCLEAR LAUNCH PROTECTION (State fixed) ---
 const DebugScreen = ({ isVisible, onClose, handleDeleteAllRecipes, userId }) => {
     const [accessCode, setAccessCode] = useState('');
     const [hasError, setHasError] = useState(false);
@@ -607,7 +623,13 @@ function App() {
     if (!db || !userId) return showCustomError("Auth required.");
     if (window.confirm(`Delete "${recipeName}"?`)) {
         const recipe = recipes.find(r => r.id === recipeId);
-        if (recipe?.userId !== userId && !(userProfile && userProfile.isAdmin)) return showCustomError("Not your recipe.");
+        
+        // Check if Admin OR Owner
+        const isAdmin = userProfile && userProfile.isAdmin;
+        const isOwner = recipe?.userId === userId;
+
+        if (!isOwner && !isAdmin) return showCustomError("Not your recipe.");
+        
         await deleteDoc(doc(db, RECIPES_COLLECTION_PATH, recipeId));
     }
   };
@@ -736,6 +758,9 @@ function App() {
         </header>
         {error && <div className="fixed top-20 left-1/2 transform -translate-x-1/2 z-50 px-6 py-3 bg-red-500 text-white rounded-full shadow-xl text-sm font-medium animate-bounce">{error}</div>}
         <main className="max-w-7xl mx-auto px-4 py-8">
+          
+          {/* WELCOME BANNER REMOVED PER REQUEST */}
+
           <div className="flex flex-col md:flex-row gap-4 mb-8">
             <div className="relative flex-1"><Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" /><input type="text" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder="Search recipes..." className="w-full pl-12 pr-4 py-3 rounded-xl border-none bg-white shadow-sm focus:ring-2 focus:ring-[#FF654F]" /></div>
             <div className="flex gap-2 overflow-x-auto pb-2 md:pb-0 hide-scrollbar">
