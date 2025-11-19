@@ -28,12 +28,12 @@ const firebaseConfig = {
 // ---------------------------------------
 // 1. CONSTANTS & DATA MODELS
 // ---------------------------------------
-const APP_VERSION = 'v0.1.005';
+const APP_VERSION = 'v0.1.006';
 const RECIPES_COLLECTION_PATH = 'public_recipes'; 
 const SITE_TITLE = 'The Recipe Book'; 
 
 // 🔴 TODO: REPLACE WITH YOUR GOOGLE EMAIL
-const ADMIN_EMAILS = ['nick@thegoodok.com']; 
+const ADMIN_EMAILS = ['YOUR_ADMIN_EMAIL@gmail.com']; 
 
 // Helper to generate number ranges
 const range = (start, end) => Array.from({length: end - start + 1}, (_, i) => (start + i).toString());
@@ -120,6 +120,7 @@ const CORE_PARAMS_MAP = [
   { key: 'noiseReduction', genericLabel: 'Noise Reduction', labels: { 'Fujifilm': 'High ISO NR', 'Canon': 'High ISO NR', 'Nikon': 'High ISO NR', 'Sony': 'High ISO NR', 'Ricoh': 'High ISO NR', 'Olympus/OM System': 'Noise Filter' }},
   { key: 'clarity', genericLabel: 'Clarity', labels: { 'Fujifilm': 'Clarity', 'Canon': 'Clarity', 'Nikon': 'Clarity', 'Sony': 'Clarity', 'Ricoh': 'Clarity', 'Olympus/OM System': 'Midtones' }},
   
+  // --- BRAND SPECIFIC FIELDS ---
   { key: 'grainEffect', genericLabel: 'Grain Effect', supportedBrands: ['Fujifilm'], labels: { 'Fujifilm': 'Grain Effect' } },
   { key: 'chromeEffect', genericLabel: 'Color Chrome Effect', supportedBrands: ['Fujifilm'], labels: { 'Fujifilm': 'Color Chrome Effect' } },
   { key: 'chromeBlue', genericLabel: 'Color Chrome FX Blue', supportedBrands: ['Fujifilm'], labels: { 'Fujifilm': 'Color Chrome FX Blue' } },
@@ -457,17 +458,22 @@ const RecipeForm = ({ recipeData, isVisible, onClose, onSubmit, onInputChange, o
     );
 };
 
-// --- NEW: NUCLEAR LAUNCH PROTECTION ---
+// --- UPDATED: NUCLEAR LAUNCH PROTECTION (State fixed) ---
 const DebugScreen = ({ isVisible, onClose, handleDeleteAllRecipes, userId }) => {
     const [accessCode, setAccessCode] = useState('');
+    const [hasError, setHasError] = useState(false);
     
     if (!isVisible) return null;
 
     const handleNuclearLaunch = () => {
         if (accessCode === 'fromorbit') {
             handleDeleteAllRecipes();
+            setAccessCode('');
+            setHasError(false);
+            onClose();
         } else {
-            alert("Access Denied. Incorrect nuclear code.");
+            setHasError(true);
+            setTimeout(() => setHasError(false), 500); // Reset shake animation
         }
     };
 
@@ -480,10 +486,15 @@ const DebugScreen = ({ isVisible, onClose, handleDeleteAllRecipes, userId }) => 
                         <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center"><AlertTriangle className="w-5 h-5 mr-2 text-red-500" />Danger Zone</h3>
                         <div className='mb-4 p-3 bg-gray-100 rounded-lg'><p className='text-xs font-semibold text-gray-700 mb-1'>User ID:</p><p className='text-xs font-mono break-all text-gray-800'>{userId || 'Authenticating...'}</p></div>
                         
-                        {/* NUCLEAR INPUT */}
                         <div className="mb-3">
                             <label className="block text-xs font-bold text-red-600 mb-1">Nuclear Code Required</label>
-                            <input type="password" value={accessCode} onChange={(e) => setAccessCode(e.target.value)} className="w-full border-red-300 rounded-lg focus:ring-red-500 focus:border-red-500 text-sm" placeholder="Enter code..." />
+                            <input 
+                                type="password" 
+                                value={accessCode} 
+                                onChange={(e) => setAccessCode(e.target.value)} 
+                                className={`w-full border rounded-lg text-sm p-2 transition-all ${hasError ? 'border-red-500 ring-2 ring-red-500 animate-pulse' : 'border-red-300 focus:ring-red-500'}`} 
+                                placeholder='Enter "fromorbit" to confirm' 
+                            />
                         </div>
 
                         <button onClick={handleNuclearLaunch} className="flex items-center w-full justify-center px-4 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg font-bold shadow-md transition">
