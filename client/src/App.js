@@ -12,7 +12,7 @@ import {
   updateProfile
 } from 'firebase/auth';
 import { getFirestore, collection, onSnapshot, query, addDoc, setDoc, doc, deleteDoc, updateDoc, arrayUnion, arrayRemove, serverTimestamp, getDocs, writeBatch } from 'firebase/firestore';
-import { Camera, Image as ImageIcon, PlusCircle, Aperture, Search, Zap, UploadCloud, X, Settings, Bookmark, Star, BookOpen, MoreVertical, Edit, Trash2, Bug, AlertTriangle, Info, LogOut, User, Mail, Lock, ChevronRight } from 'lucide-react';
+import { Camera, Image as ImageIcon, PlusCircle, Aperture, Search, Zap, UploadCloud, X, Settings, Bookmark, Star, BookOpen, MoreVertical, Edit, Trash2, Bug, AlertTriangle, Info, LogOut, User, Mail, Lock, ChevronRight, Shield, Flame } from 'lucide-react';
 
 // --- CONFIGURATION ---
 const firebaseConfig = {
@@ -28,9 +28,12 @@ const firebaseConfig = {
 // ---------------------------------------
 // 1. CONSTANTS & DATA MODELS
 // ---------------------------------------
-const APP_VERSION = 'v0.1.003';
+const APP_VERSION = 'v0.1.005';
 const RECIPES_COLLECTION_PATH = 'public_recipes'; 
 const SITE_TITLE = 'The Recipe Book'; 
+
+// 🔴 TODO: REPLACE WITH YOUR GOOGLE EMAIL
+const ADMIN_EMAILS = ['YOUR_ADMIN_EMAIL@gmail.com']; 
 
 // Helper to generate number ranges
 const range = (start, end) => Array.from({length: end - start + 1}, (_, i) => (start + i).toString());
@@ -117,7 +120,6 @@ const CORE_PARAMS_MAP = [
   { key: 'noiseReduction', genericLabel: 'Noise Reduction', labels: { 'Fujifilm': 'High ISO NR', 'Canon': 'High ISO NR', 'Nikon': 'High ISO NR', 'Sony': 'High ISO NR', 'Ricoh': 'High ISO NR', 'Olympus/OM System': 'Noise Filter' }},
   { key: 'clarity', genericLabel: 'Clarity', labels: { 'Fujifilm': 'Clarity', 'Canon': 'Clarity', 'Nikon': 'Clarity', 'Sony': 'Clarity', 'Ricoh': 'Clarity', 'Olympus/OM System': 'Midtones' }},
   
-  // --- BRAND SPECIFIC FIELDS ---
   { key: 'grainEffect', genericLabel: 'Grain Effect', supportedBrands: ['Fujifilm'], labels: { 'Fujifilm': 'Grain Effect' } },
   { key: 'chromeEffect', genericLabel: 'Color Chrome Effect', supportedBrands: ['Fujifilm'], labels: { 'Fujifilm': 'Color Chrome Effect' } },
   { key: 'chromeBlue', genericLabel: 'Color Chrome FX Blue', supportedBrands: ['Fujifilm'], labels: { 'Fujifilm': 'Color Chrome FX Blue' } },
@@ -165,7 +167,6 @@ const compressImage = (file) => {
 // 2. SUB-COMPONENTS
 // ---------------------------------------
 
-// --- NEW: AUTH MODAL ---
 const AuthModal = ({ isVisible, onClose, auth, showCustomError }) => {
     const [isSignUp, setIsSignUp] = useState(false);
     const [email, setEmail] = useState('');
@@ -332,7 +333,6 @@ const RecipeDetailModal = ({ recipe, isVisible, onClose, userId, toggleFavorite,
                             {allSettings.map(setting => (<div key={setting.key}><p className="text-xs font-bold uppercase text-gray-500 tracking-wider mb-0.5">{setting.label}</p><p className="text-lg font-mono font-medium text-gray-900">{setting.value}</p></div>))}
                         </div>
                     </div>
-                    
                     {/* NOTES HIDDEN */}
                 </div>
             </div>
@@ -457,13 +457,40 @@ const RecipeForm = ({ recipeData, isVisible, onClose, onSubmit, onInputChange, o
     );
 };
 
+// --- NEW: NUCLEAR LAUNCH PROTECTION ---
 const DebugScreen = ({ isVisible, onClose, handleDeleteAllRecipes, userId }) => {
+    const [accessCode, setAccessCode] = useState('');
+    
     if (!isVisible) return null;
+
+    const handleNuclearLaunch = () => {
+        if (accessCode === 'fromorbit') {
+            handleDeleteAllRecipes();
+        } else {
+            alert("Access Denied. Incorrect nuclear code.");
+        }
+    };
+
     return (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
             <div className="bg-white rounded-2xl w-full max-w-4xl shadow-2xl overflow-hidden">
-                <div className="flex justify-between items-center p-6 border-b border-gray-100 bg-gray-50/50"><h2 className="text-xl font-bold text-gray-800 flex items-center"><Bug className="w-5 h-5 mr-2 text-gray-500" />Debug Menu</h2><button onClick={onClose} className="text-gray-400 hover:text-gray-600 p-2 hover:bg-gray-100 rounded-full transition"><X className="w-6 h-6" /></button></div>
-                <div className="p-6 grid grid-cols-1 lg:grid-cols-3 gap-8"><div className="lg:col-span-1 border-r lg:pr-8"><h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center"><AlertTriangle className="w-5 h-5 mr-2 text-red-500" />Database Tools</h3><div className='mb-4 p-3 bg-gray-100 rounded-lg'><p className='text-xs font-semibold text-gray-700 mb-1'>User ID:</p><p className='text-xs font-mono break-all text-gray-800'>{userId || 'Authenticating...'}</p></div><button onClick={handleDeleteAllRecipes} className="flex items-center w-full justify-center px-4 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg font-bold shadow-md transition"><Trash2 className="w-5 h-5 mr-2" /> Reset All Data</button></div></div>
+                <div className="flex justify-between items-center p-6 border-b border-gray-100 bg-gray-50/50"><h2 className="text-xl font-bold text-gray-800 flex items-center"><Bug className="w-5 h-5 mr-2 text-gray-500" />Debug Menu (Admin)</h2><button onClick={onClose} className="text-gray-400 hover:text-gray-600 p-2 hover:bg-gray-100 rounded-full transition"><X className="w-6 h-6" /></button></div>
+                <div className="p-6 grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    <div className="lg:col-span-1 border-r lg:pr-8">
+                        <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center"><AlertTriangle className="w-5 h-5 mr-2 text-red-500" />Danger Zone</h3>
+                        <div className='mb-4 p-3 bg-gray-100 rounded-lg'><p className='text-xs font-semibold text-gray-700 mb-1'>User ID:</p><p className='text-xs font-mono break-all text-gray-800'>{userId || 'Authenticating...'}</p></div>
+                        
+                        {/* NUCLEAR INPUT */}
+                        <div className="mb-3">
+                            <label className="block text-xs font-bold text-red-600 mb-1">Nuclear Code Required</label>
+                            <input type="password" value={accessCode} onChange={(e) => setAccessCode(e.target.value)} className="w-full border-red-300 rounded-lg focus:ring-red-500 focus:border-red-500 text-sm" placeholder="Enter code..." />
+                        </div>
+
+                        <button onClick={handleNuclearLaunch} className="flex items-center w-full justify-center px-4 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg font-bold shadow-md transition">
+                            <Flame className="w-5 h-5 mr-2" /> Reset All Data
+                        </button>
+                    </div>
+                </div>
             </div>
         </div>
     );
@@ -511,9 +538,17 @@ function App() {
           setUserId(user.uid);
           // Check if Anon or Real
           if (!user.isAnonymous) {
-              setUserProfile({ name: user.displayName || user.email, photo: user.photoURL });
+              // CHECK IF ADMIN (Matches email list OR Google email)
+              const email = user.email;
+              const isAdmin = ADMIN_EMAILS.includes(email);
+              setUserProfile({ 
+                  name: user.displayName || user.email, 
+                  photo: user.photoURL,
+                  email: email,
+                  isAdmin: isAdmin 
+              });
           } else {
-              setUserProfile(null); // Still null for guests
+              setUserProfile(null); // Guest
           }
         } else {
            try { const cred = await signInAnonymously(firebaseAuth); setUserId(cred.user.uid); setUserProfile(null); } 
@@ -569,13 +604,11 @@ function App() {
   };
 
   const handleDeleteAllRecipes = async () => {
-    if (window.confirm("Delete ALL recipes?")) {
-        const snap = await getDocs(collection(db, RECIPES_COLLECTION_PATH));
-        const batch = writeBatch(db);
-        snap.docs.forEach(doc => batch.delete(doc.ref));
-        await batch.commit();
-        setIsDebugMenuOpen(false);
-    }
+    const snap = await getDocs(collection(db, RECIPES_COLLECTION_PATH));
+    const batch = writeBatch(db);
+    snap.docs.forEach(doc => batch.delete(doc.ref));
+    await batch.commit();
+    setIsDebugMenuOpen(false);
   }
 
   const filteredRecipes = useMemo(() => {
@@ -658,6 +691,10 @@ function App() {
                        ) : (
                            <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-white font-bold text-xs">{userProfile.name?.[0]}</div>
                        )}
+                       
+                       {/* ADMIN BADGE */}
+                       {userProfile.isAdmin && <div title="Admin Access" className="bg-red-100 text-red-600 p-1 rounded-full"><Shield className="w-4 h-4" /></div>}
+
                        <button onClick={handleSignOut} className="p-2 rounded-full text-red-500 hover:bg-red-50 transition" title="Sign Out"><LogOut className="w-5 h-5" /></button>
                    </div>
                ) : (
@@ -666,8 +703,10 @@ function App() {
                    </button>
                )}
                
-               {/* ADMIN ONLY: Debug Menu */}
-               {userProfile && <button onClick={() => setIsDebugMenuOpen(true)} className="p-2 rounded-full text-gray-700 hover:bg-gray-100 transition"><Settings className="w-5 h-5" /></button>}
+               {/* ADMIN ONLY: Debug Menu is now strictly for Admins */}
+               {userProfile && userProfile.isAdmin && (
+                   <button onClick={() => setIsDebugMenuOpen(true)} className="p-2 rounded-full text-gray-700 hover:bg-gray-100 transition"><Settings className="w-5 h-5" /></button>
+               )}
                
                {/* NEW RECIPE: Visible to all, but triggers login for guests */}
                <button 
