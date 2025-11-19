@@ -31,7 +31,6 @@ const BASE_PROFILES_BY_BRAND = {
     'Canon': ['Standard', 'Portrait', 'Landscape', 'Fine Detail', 'Neutral', 'Faithful', 'Monochrome'],
     'Nikon': ['Standard', 'Portrait', 'Landscape', 'Flat', 'Dream', 'Morning', 'Pop', 'Sunday', 'Somber', 'Dramatic', 'Silence', 'Bleached', 'Melancholic', 'Pure', 'Denim', 'Toy', 'Sepia', 'Blue', 'Red', 'Pink', 'Charcoal', 'Graphite', 'Binary', 'Carbon'],
     'Sony': ['ST (Standard)', 'PT (Portrait)', 'LA (Landscape)', 'VV (Vivid)', 'Clear', 'Deep', 'Light', 'M (Sepia)', 'W (Black/White)', 'Creative Look (FL)', 'Creative Look (IN)', 'Creative Look (SH)'],
-    // FIXED: Real Ricoh Image Controls
     'Ricoh': ['Standard', 'Vivid', 'Monotone', 'Soft Monotone', 'Hard Monotone', 'Hi-Contrast B&W', 'Negative Film', 'Positive Film', 'Bleach Bypass', 'Retro', 'HDR Tone', 'Cross Process'],
     'Olympus/OM System': ['i-Enhance', 'Vivid', 'Natural', 'Muted', 'Portrait', 'Monotone', 'Custom1', 'Custom2', 'Sepia', 'Art Filter (Various)']
 };
@@ -46,7 +45,6 @@ const BRAND_SPECIFIC_OPTIONS = {
         sharpness: plusRange(-4, 4),
         noiseReduction: plusRange(-4, 4),
         clarity: plusRange(-5, 5),
-        // Fuji Specifics
         grainEffect: ['Off', 'Weak Small', 'Weak Large', 'Strong Small', 'Strong Large'],
         chromeEffect: ['Off', 'Weak', 'Strong'],
         chromeBlue: ['Off', 'Weak', 'Strong'],
@@ -97,7 +95,6 @@ const BRAND_MODELS = {
 
 const IMAGE_CONFIG = { maxWidth: 800, quality: 0.75, maxInputSizeMB: 10, outputFormat: 'image/jpeg' };
 
-// --- UPDATED: BRAND AWARENESS IN PARAMS ---
 const CORE_PARAMS_MAP = [
   { key: 'baseProfile', genericLabel: 'Base Profile / Simulation', labels: { 'Fujifilm': 'Film Simulation', 'Canon': 'Picture Style', 'Nikon': 'Picture Control', 'Sony': 'Creative Style / Look', 'Ricoh': 'Image Control', 'Olympus/OM System': 'Picture Mode' }},
   { key: 'dynamicRange', genericLabel: 'Dynamic Range', labels: { 'Fujifilm': 'DR Setting', 'Canon': 'ALO', 'Nikon': 'ADL', 'Sony': 'DRO / HDR', 'Ricoh': 'DR Comp.', 'Olympus/OM System': 'Gradation' }},
@@ -211,12 +208,15 @@ const RecipeDetailModal = ({ recipe, isVisible, onClose, userId, toggleFavorite,
                     </div>
                     <div className="lg:col-span-2 p-6">
                         <h3 className="text-xl font-bold text-gray-800 mb-4 flex items-center"><Aperture className="w-5 h-5 mr-2 text-[#FF654F]" />Full Settings List</h3>
-                        {/* CHANGED: Using grid-cols-2 md:grid-cols-3 for denser packing on desktop */}
                         <div className="grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-6">
                             {allSettings.map(setting => (<div key={setting.key}><p className="text-xs font-bold uppercase text-gray-500 tracking-wider mb-0.5">{setting.label}</p><p className="text-lg font-mono font-medium text-gray-900">{setting.value}</p></div>))}
                         </div>
                     </div>
+                    
+                    {/* NOTES HIDDEN: Code foundation preserved for future use
                     {recipe.notes && <div className="lg:col-span-3 p-6 pt-0 border-t border-gray-100 lg:border-t-0"><h3 className="text-xl font-bold text-gray-800 mb-4 flex items-center"><Info className="w-5 h-5 mr-2 text-blue-500" />Creator Notes</h3><p className="text-sm text-gray-700 whitespace-pre-wrap">{recipe.notes}</p></div>}
+                    */}
+
                 </div>
             </div>
         </div>
@@ -258,7 +258,11 @@ const RecipeCard = ({ recipe, userId, isFavorite, toggleFavorite, toggleEndorsem
           {settingsWithValues.slice(0, 6).map((param) => (<div key={param.key} className="flex flex-col"><span className="font-semibold text-gray-500 text-[10px] uppercase tracking-wider">{getLabelForBrand(param.key, recipe.brand)}</span><span className="text-[#FF654F] font-medium font-mono truncate" title={recipe[param.key]}>{recipe[param.key]}</span></div>))}
           {settingsWithValues.length > 6 && (<div className="col-span-2 text-center pt-2"><span className="text-xs text-gray-400 italic">+{settingsWithValues.length - 6} more settings</span></div>)}
         </div>
+        
+        {/* NOTES HIDDEN:
         {recipe.notes && <div className="mt-auto pt-3 bg-gray-50 -mx-5 -mb-5 p-4 border-t border-gray-100"><p className="text-gray-600 text-xs italic line-clamp-3">"{recipe.notes}"</p></div>}
+        */}
+
       </div>
     </div>
   );
@@ -296,12 +300,11 @@ const RecipeForm = ({ recipeData, isVisible, onClose, onSubmit, onInputChange, o
                     </div>
                     <div className="bg-[#FF654F]/10 rounded-xl p-5 mb-6 border border-[#FF654F]/30">
                         <h3 className="text-sm font-bold text-[#FF654F] mb-4 flex items-center"><Aperture className="w-4 h-4 mr-2" />Settings ({recipeData.brand})</h3>
-                        {/* CHANGED: Using grid-cols-1 sm:grid-cols-3 for denser form packing */}
                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                             <div><label className="block text-xs font-medium text-gray-600 mb-1">{getLabelForBrand('baseProfile', recipeData.brand)} *</label><select name="baseProfile" value={recipeData.baseProfile} onChange={onInputChange} className="w-full text-sm border-gray-300 rounded-md focus:ring-[#FF654F] focus:border-[#FF654F]" required>{BASE_PROFILES_BY_BRAND[recipeData.brand]?.map(profile => <option key={profile} value={profile}>{profile}</option>)}</select></div>
                             
                             {CORE_PARAMS_MAP.filter(p => p.key !== 'baseProfile').map(param => {
-                                // VISIBILITY CHECK: Only show if universal OR belongs to this brand
+                                // VISIBILITY CHECK
                                 if (!isFieldVisible(param, recipeData.brand)) return null;
 
                                 const options = BRAND_SPECIFIC_OPTIONS[recipeData.brand]?.[param.key];
@@ -321,7 +324,11 @@ const RecipeForm = ({ recipeData, isVisible, onClose, onSubmit, onInputChange, o
                             })}
                         </div>
                     </div>
+                    
+                    {/* NOTES HIDDEN:
                     <div className="mb-6"><label className="block text-xs font-bold uppercase text-gray-500 tracking-wider mb-1">Notes</label><textarea name="notes" rows="3" value={recipeData.notes} onChange={onInputChange} className="w-full border-gray-300 rounded-lg shadow-sm focus:ring-[#FF654F] focus:border-[#FF654F]" /></div>
+                    */}
+
                     <button type="submit" className="w-full py-4 bg-[#FF654F] hover:bg-red-500 text-white rounded-xl font-bold shadow-lg transform transition hover:-translate-y-0.5 flex justify-center items-center">{isEditing ? <Edit className="w-5 h-5 mr-2" /> : <PlusCircle className="w-5 h-5 mr-2" />}{isEditing ? 'Update Recipe' : 'Publish Recipe'}</button>
                 </form>
             </div>
