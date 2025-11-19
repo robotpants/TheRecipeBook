@@ -28,12 +28,12 @@ const firebaseConfig = {
 // ---------------------------------------
 // 1. CONSTANTS & DATA MODELS
 // ---------------------------------------
-const APP_VERSION = 'v0.1.006';
+const APP_VERSION = 'v0.1.007';
 const RECIPES_COLLECTION_PATH = 'public_recipes'; 
 const SITE_TITLE = 'The Recipe Book'; 
 
-// 🔴 TODO: REPLACE WITH YOUR GOOGLE EMAIL
-const ADMIN_EMAILS = ['YOUR_ADMIN_EMAIL@gmail.com']; 
+// ✅ ADMIN CONFIGURATION
+const ADMIN_EMAILS = ['nick@thegoodok.com']; 
 
 // Helper to generate number ranges
 const range = (start, end) => Array.from({length: end - start + 1}, (_, i) => (start + i).toString());
@@ -549,7 +549,7 @@ function App() {
           setUserId(user.uid);
           // Check if Anon or Real
           if (!user.isAnonymous) {
-              // CHECK IF ADMIN (Matches email list OR Google email)
+              // CHECK IF ADMIN
               const email = user.email;
               const isAdmin = ADMIN_EMAILS.includes(email);
               setUserProfile({ 
