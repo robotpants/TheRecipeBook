@@ -33,7 +33,7 @@ const RECIPES_COLLECTION_PATH = 'public_recipes';
 const SITE_TITLE = 'The Recipe Book'; 
 
 // 🔴 TODO: REPLACE WITH YOUR GOOGLE EMAIL
-const ADMIN_EMAILS = ['YOUR_ADMIN_EMAIL@gmail.com']; 
+const ADMIN_EMAILS = ['nick@thegoodok.com']; 
 
 // Helper to generate number ranges
 const range = (start, end) => Array.from({length: end - start + 1}, (_, i) => (start + i).toString());
