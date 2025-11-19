@@ -12,7 +12,7 @@ import {
   updateProfile
 } from 'firebase/auth';
 import { getFirestore, collection, onSnapshot, query, addDoc, setDoc, doc, deleteDoc, updateDoc, arrayUnion, arrayRemove, serverTimestamp, getDocs, writeBatch } from 'firebase/firestore';
-import { Camera, Image as ImageIcon, PlusCircle, Aperture, Search, Zap, UploadCloud, X, Settings, Bookmark, Star, BookOpen, MoreVertical, Edit, Trash2, Bug, AlertTriangle, Info, LogOut, User, Mail, Lock, ChevronRight, Shield, Flame } from 'lucide-react';
+import { Camera, Image as ImageIcon, PlusCircle, Aperture, Search, Zap, UploadCloud, X, Settings, Bookmark, Star, BookOpen, MoreVertical, Edit, Trash2, Bug, AlertTriangle, Info, LogOut, User, Mail, Lock, ChevronRight, Shield, Flame, Rocket } from 'lucide-react';
 
 // --- CONFIGURATION ---
 const firebaseConfig = {
@@ -28,7 +28,7 @@ const firebaseConfig = {
 // ---------------------------------------
 // 1. CONSTANTS & DATA MODELS
 // ---------------------------------------
-const APP_VERSION = 'v0.1.013';
+const APP_VERSION = 'v0.1.014';
 const RECIPES_COLLECTION_PATH = 'public_recipes'; 
 const SITE_TITLE = 'The Recipe Book'; 
 
@@ -45,7 +45,7 @@ const BASE_PROFILES_BY_BRAND = {
     'Nikon': ['Standard', 'Portrait', 'Landscape', 'Flat', 'Dream', 'Morning', 'Pop', 'Sunday', 'Somber', 'Dramatic', 'Silence', 'Bleached', 'Melancholic', 'Pure', 'Denim', 'Toy', 'Sepia', 'Blue', 'Red', 'Pink', 'Charcoal', 'Graphite', 'Binary', 'Carbon'],
     'Sony': ['ST (Standard)', 'PT (Portrait)', 'LA (Landscape)', 'VV (Vivid)', 'Clear', 'Deep', 'Light', 'M (Sepia)', 'W (Black/White)', 'Creative Look (FL)', 'Creative Look (IN)', 'Creative Look (SH)'],
     'Ricoh': ['Standard', 'Vivid', 'Monotone', 'Soft Monotone', 'Hard Monotone', 'Hi-Contrast B&W', 'Negative Film', 'Positive Film', 'Bleach Bypass', 'Retro', 'HDR Tone', 'Cross Process'],
-    'Olympus/OM System': ['i-Enhance', 'Vivid', 'Natural', 'Muted', 'Portrait', 'Monotone', 'Custom1', 'Custom2', 'Sepia', 'Art Filter (Various)']
+    'Olympus/OM': ['i-Enhance', 'Vivid', 'Natural', 'Muted', 'Portrait', 'Monotone', 'Custom1', 'Custom2', 'Sepia', 'Art Filter (Various)']
 };
 
 // --- SMART OPTIONS PER BRAND ---
@@ -105,7 +105,7 @@ const BRAND_SPECIFIC_OPTIONS = {
         colorSaturation: range(-4, 4),
         noiseReduction: ['Off', 'Low', 'High', 'Auto']
     },
-    'Olympus/OM System': {
+    'Olympus/OM': {
         whiteBalance: ['Auto', 'Sunny', 'Shadow', 'Cloudy', 'Incandescent', 'Fluorescent', 'Underwater', 'Flash', 'Custom', 'Color Temp'],
         dynamicRange: ['Auto', 'Normal', 'High Key', 'Low Key'],
         highlightTone: range(-7, 7),
@@ -125,22 +125,22 @@ const BRAND_MODELS = {
     'Nikon': ['Z9', 'Z8', 'Z7 II', 'Z6 II', 'Zf', 'Zfc', 'Z5', 'Z50', 'Z30', 'D850', 'D780', 'D500'],
     'Sony': ['A1', 'A9 III', 'A7S III', 'A7R V', 'A7R IV', 'A7 IV', 'A7C II', 'A7CR', 'A6700', 'A6600', 'ZV-E10', 'ZV-1 II'],
     'Ricoh': ['GR IIIx', 'GR III', 'GR II'],
-    'Olympus/OM System': ['OM-1 II', 'OM-1', 'OM-5', 'E-M1 Mark III', 'E-M5 Mark III', 'E-M10 Mark IV'],
+    'Olympus/OM': ['OM-1 II', 'OM-1', 'OM-5', 'E-M1 Mark III', 'E-M5 Mark III', 'E-M10 Mark IV'],
 };
 
 const IMAGE_CONFIG = { maxWidth: 800, quality: 0.75, maxInputSizeMB: 10, outputFormat: 'image/jpeg' };
 
 const CORE_PARAMS_MAP = [
-  { key: 'baseProfile', genericLabel: 'Base Profile / Simulation', labels: { 'Fujifilm': 'Film Simulation', 'Canon': 'Picture Style', 'Nikon': 'Picture Control', 'Sony': 'Creative Style / Look', 'Ricoh': 'Image Control', 'Olympus/OM System': 'Picture Mode' }},
-  { key: 'dynamicRange', genericLabel: 'Dynamic Range', labels: { 'Fujifilm': 'DR Setting', 'Canon': 'ALO', 'Nikon': 'ADL', 'Sony': 'DRO / HDR', 'Ricoh': 'DR Comp.', 'Olympus/OM System': 'Gradation' }},
-  { key: 'whiteBalance', genericLabel: 'White Balance', labels: { 'Fujifilm': 'WB Preset', 'Canon': 'WB Preset', 'Nikon': 'WB Preset', 'Sony': 'WB Preset', 'Ricoh': 'WB Preset', 'Olympus/OM System': 'WB Preset' }},
-  { key: 'wbShift', genericLabel: 'WB Shift', labels: { 'Fujifilm': 'WB Shift', 'Canon': 'Color Tone', 'Nikon': 'WB Adjust', 'Sony': 'Color Phase', 'Ricoh': 'WB Adj', 'Olympus/OM System': 'WB Custom Adj' }},
-  { key: 'highlightTone', genericLabel: 'Highlights', labels: { 'Fujifilm': 'Highlight Tone', 'Canon': 'Contrast (Hi)', 'Nikon': 'Highlights', 'Sony': 'Highlights', 'Ricoh': 'Contrast (Hi)', 'Olympus/OM System': 'Highlight' }},
-  { key: 'shadowTone', genericLabel: 'Shadows', labels: { 'Fujifilm': 'Shadow Tone', 'Canon': 'Contrast (Lo)', 'Nikon': 'Shadows', 'Sony': 'Shadows', 'Ricoh': 'Contrast (Lo)', 'Olympus/OM System': 'Shadow' }},
-  { key: 'colorSaturation', genericLabel: 'Color', labels: { 'Fujifilm': 'Color', 'Canon': 'Saturation', 'Nikon': 'Saturation', 'Sony': 'Saturation', 'Ricoh': 'Saturation', 'Olympus/OM System': 'Color' }},
-  { key: 'sharpness', genericLabel: 'Sharpness', labels: { 'Fujifilm': 'Sharpness', 'Canon': 'Sharpness', 'Nikon': 'Sharpening', 'Sony': 'Sharpening', 'Ricoh': 'Sharpness', 'Olympus/OM System': 'Sharpness' }},
-  { key: 'noiseReduction', genericLabel: 'Noise Reduction', labels: { 'Fujifilm': 'High ISO NR', 'Canon': 'High ISO NR', 'Nikon': 'High ISO NR', 'Sony': 'High ISO NR', 'Ricoh': 'High ISO NR', 'Olympus/OM System': 'Noise Filter' }},
-  { key: 'clarity', genericLabel: 'Clarity', labels: { 'Fujifilm': 'Clarity', 'Canon': 'Clarity', 'Nikon': 'Clarity', 'Sony': 'Clarity', 'Ricoh': 'Clarity', 'Olympus/OM System': 'Midtones' }},
+  { key: 'baseProfile', genericLabel: 'Base Profile / Simulation', labels: { 'Fujifilm': 'Film Simulation', 'Canon': 'Picture Style', 'Nikon': 'Picture Control', 'Sony': 'Creative Style / Look', 'Ricoh': 'Image Control', 'Olympus/OM': 'Picture Mode' }},
+  { key: 'dynamicRange', genericLabel: 'Dynamic Range', labels: { 'Fujifilm': 'DR Setting', 'Canon': 'ALO', 'Nikon': 'ADL', 'Sony': 'DRO / HDR', 'Ricoh': 'DR Comp.', 'Olympus/OM': 'Gradation' }},
+  { key: 'whiteBalance', genericLabel: 'White Balance', labels: { 'Fujifilm': 'WB Preset', 'Canon': 'WB Preset', 'Nikon': 'WB Preset', 'Sony': 'WB Preset', 'Ricoh': 'WB Preset', 'Olympus/OM': 'WB Preset' }},
+  { key: 'wbShift', genericLabel: 'WB Shift', labels: { 'Fujifilm': 'WB Shift', 'Canon': 'Color Tone', 'Nikon': 'WB Adjust', 'Sony': 'Color Phase', 'Ricoh': 'WB Adj', 'Olympus/OM': 'WB Custom Adj' }},
+  { key: 'highlightTone', genericLabel: 'Highlights', labels: { 'Fujifilm': 'Highlight Tone', 'Canon': 'Contrast (Hi)', 'Nikon': 'Highlights', 'Sony': 'Highlights', 'Ricoh': 'Contrast (Hi)', 'Olympus/OM': 'Highlight' }},
+  { key: 'shadowTone', genericLabel: 'Shadows', labels: { 'Fujifilm': 'Shadow Tone', 'Canon': 'Contrast (Lo)', 'Nikon': 'Shadows', 'Sony': 'Shadows', 'Ricoh': 'Contrast (Lo)', 'Olympus/OM': 'Shadow' }},
+  { key: 'colorSaturation', genericLabel: 'Color', labels: { 'Fujifilm': 'Color', 'Canon': 'Saturation', 'Nikon': 'Saturation', 'Sony': 'Saturation', 'Ricoh': 'Saturation', 'Olympus/OM': 'Color' }},
+  { key: 'sharpness', genericLabel: 'Sharpness', labels: { 'Fujifilm': 'Sharpness', 'Canon': 'Sharpness', 'Nikon': 'Sharpening', 'Sony': 'Sharpening', 'Ricoh': 'Sharpness', 'Olympus/OM': 'Sharpness' }},
+  { key: 'noiseReduction', genericLabel: 'Noise Reduction', labels: { 'Fujifilm': 'High ISO NR', 'Canon': 'High ISO NR', 'Nikon': 'High ISO NR', 'Sony': 'High ISO NR', 'Ricoh': 'High ISO NR', 'Olympus/OM': 'Noise Filter' }},
+  { key: 'clarity', genericLabel: 'Clarity', labels: { 'Fujifilm': 'Clarity', 'Canon': 'Clarity', 'Nikon': 'Clarity', 'Sony': 'Clarity', 'Ricoh': 'Clarity', 'Olympus/OM': 'Midtones' }},
   
   // --- BRAND SPECIFIC FIELDS ---
   { key: 'grainEffect', genericLabel: 'Grain Effect', supportedBrands: ['Fujifilm'], labels: { 'Fujifilm': 'Grain Effect' } },
@@ -292,7 +292,7 @@ const AboutModal = ({ isVisible, onClose }) => {
                 <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 p-2 hover:bg-gray-100 rounded-full transition"><X className="w-5 h-5" /></button>
                 <div className="p-8 text-center">
                     <div className="mx-auto bg-[#FF654F]/10 w-16 h-16 rounded-full flex items-center justify-center mb-4">
-                        <BookOpen className="w-8 h-8 text-[#FF654F]" />
+                        <Aperture className="w-8 h-8 text-[#FF654F]" />
                     </div>
                     <h2 className="text-2xl font-black text-gray-900 mb-2">Recipes for All</h2>
                     <p className="text-gray-600 leading-relaxed text-sm">
@@ -349,7 +349,7 @@ const RecipeDetailModal = ({ recipe, isVisible, onClose, userId, isAdmin, toggle
                                 <Bookmark className={`w-4 h-4 mr-2 ${isFavorite ? 'fill-white' : 'fill-gray-600'}`} /> {isFavorite ? 'Bookmarked' : 'Bookmark'}
                             </button>
                             <button onClick={() => toggleEndorsement(recipe.id, isEndorsed)} className={`flex-1 flex items-center justify-center px-4 py-3 rounded-lg text-sm font-semibold transition-all ${isEndorsed ? 'bg-yellow-500 text-white' : 'bg-gray-100 text-gray-700 hover:bg-yellow-100'}`}>
-                                <Star className={`w-4 h-4 mr-2 ${isEndorsed ? 'fill-white' : 'fill-gray-500'}`} /> Endorse ({endorsementCount})
+                                <Rocket className={`w-4 h-4 mr-2 ${isEndorsed ? 'fill-white' : 'fill-gray-500'}`} /> Endorse ({endorsementCount})
                             </button>
                         </div>
                     </div>
@@ -394,7 +394,7 @@ const RecipeCard = ({ recipe, userId, isAdmin, isFavorite, toggleFavorite, toggl
         {recipe.imageUrl ? <img src={recipe.imageUrl} alt={recipe.name} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" /> : <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-gray-100 to-gray-200 text-gray-300"><Camera className="w-12 h-12 mb-2 opacity-20" /><span className="text-xs font-mono opacity-40">No Preview</span></div>}
         
         <div className="absolute top-3 right-3 flex items-center space-x-2">
-            <button onClick={(e) => { e.stopPropagation(); toggleEndorsement(recipe.id, isEndorsed); }} className={`flex items-center text-xs font-semibold px-2.5 py-1 rounded-full shadow-md transition-all ${isEndorsed ? 'bg-yellow-500 text-white' : 'bg-white text-gray-700 hover:bg-yellow-100'}`}><Star className={`w-3 h-3 mr-1 ${isEndorsed ? 'fill-white' : 'fill-gray-400'}`} />{endorsementCount}</button>
+            <button onClick={(e) => { e.stopPropagation(); toggleEndorsement(recipe.id, isEndorsed); }} className={`flex items-center text-xs font-semibold px-2.5 py-1 rounded-full shadow-md transition-all ${isEndorsed ? 'bg-yellow-500 text-white' : 'bg-white text-gray-700 hover:bg-yellow-100'}`}><Rocket className={`w-3 h-3 mr-1 ${isEndorsed ? 'fill-white' : 'fill-gray-400'}`} />{endorsementCount}</button>
             <button onClick={(e) => { e.stopPropagation(); toggleFavorite(recipe.id, isFavorite); }} className={`p-2 rounded-full shadow-md transition-all ${isFavorite ? 'bg-[#FF654F] text-white' : 'bg-white text-gray-400 hover:text-[#FF654F] hover:bg-gray-100'}`}><Bookmark className={`w-4 h-4 ${isFavorite ? 'fill-white' : 'fill-gray-400'}`} /></button>
             
             {/* EDIT MENU: Visible if Owner OR Admin */}
@@ -755,7 +755,7 @@ function App() {
     <div className="min-h-screen bg-gray-50 font-sans text-gray-800 pb-20">
         <header className="sticky top-0 z-20 bg-white/90 backdrop-blur shadow-sm border-b border-gray-200">
           <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
-            <div className="flex items-center"><div className="bg-[#FF654F] p-2 rounded-lg mr-3"><BookOpen className="w-5 h-5 text-white" /></div><h1 className="text-2xl font-black tracking-tight text-gray-900">{SITE_TITLE}</h1></div>
+            <div className="flex items-center"><div className="bg-[#FF654F] p-2 rounded-lg mr-3"><Aperture className="w-5 h-5 text-white" /></div><h1 className="text-2xl font-black tracking-tight text-gray-900">{SITE_TITLE}</h1></div>
             <div className="flex space-x-3 items-center">
                <button onClick={() => setIsAboutOpen(true)} className="px-3 py-1 text-xs font-medium text-gray-500 bg-gray-100 hover:bg-gray-200 rounded-full transition" title="About">About</button>
                
