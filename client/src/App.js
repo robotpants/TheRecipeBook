@@ -125,46 +125,29 @@ const getLabelForBrand = (key, brand) => {
   return param.labels[brand] || param.genericLabel.split('/')[0].trim();
 };
 
-// Helper to check if a param should be shown for the current brand
 const isFieldVisible = (param, currentBrand) => {
-    if (!param.supportedBrands) return true; // Universal field
+    if (!param.supportedBrands) return true; 
     return param.supportedBrands.includes(currentBrand);
 };
 
-// --- UPDATED: Memory-safe image compression for iOS ---
 const compressImage = (file) => {
   return new Promise((resolve, reject) => {
     if (!file) return reject("No file provided");
-    
     const objectUrl = URL.createObjectURL(file);
     const img = new Image();
     img.src = objectUrl;
-    
     img.onload = () => {
-      URL.revokeObjectURL(objectUrl); // Free memory
-      
+      URL.revokeObjectURL(objectUrl);
       const canvas = document.createElement('canvas');
       let width = img.width;
       let height = img.height;
-
-      if (width > IMAGE_CONFIG.maxWidth) {
-        height *= IMAGE_CONFIG.maxWidth / width;
-        width = IMAGE_CONFIG.maxWidth;
-      }
-
-      canvas.width = width;
-      canvas.height = height;
-      
+      if (width > IMAGE_CONFIG.maxWidth) { height *= IMAGE_CONFIG.maxWidth / width; width = IMAGE_CONFIG.maxWidth; }
+      canvas.width = width; canvas.height = height;
       const ctx = canvas.getContext('2d');
       ctx.drawImage(img, 0, 0, width, height);
-
       resolve(canvas.toDataURL(IMAGE_CONFIG.outputFormat, IMAGE_CONFIG.quality));
     };
-    
-    img.onerror = (err) => {
-        URL.revokeObjectURL(objectUrl);
-        reject("Image load failed.");
-    };
+    img.onerror = (err) => { URL.revokeObjectURL(objectUrl); reject("Image load failed."); };
   });
 };
 
@@ -179,13 +162,9 @@ const RecipeDetailModal = ({ recipe, isVisible, onClose, userId, toggleFavorite,
     const isOwner = recipe.userId === userId;
     const isFavorite = recipe.isFavorite || false;
 
-    // Filter settings to only show what is relevant for this brand OR has a value
     const allSettings = CORE_PARAMS_MAP
         .filter(param => isFieldVisible(param, recipe.brand) && recipe[param.key])
-        .map(param => ({
-            key: param.key, label: getLabelForBrand(param.key, recipe.brand),
-            value: recipe[param.key], genericLabel: param.genericLabel,
-        }));
+        .map(param => ({ key: param.key, label: getLabelForBrand(param.key, recipe.brand), value: recipe[param.key], genericLabel: param.genericLabel }));
 
     return (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
@@ -193,9 +172,7 @@ const RecipeDetailModal = ({ recipe, isVisible, onClose, userId, toggleFavorite,
                 <div className="flex justify-between items-start p-6 border-b border-gray-100 bg-gray-50/50">
                     <div className='flex-1 pr-6'>
                         <h2 className="text-3xl font-black text-gray-900 leading-tight mb-1">{recipe.name}</h2>
-                        <p className="text-md font-medium text-gray-600 flex items-center mt-2">
-                            <Camera className="w-4 h-4 mr-2 text-gray-500" /> {recipe.brand} &bull; {recipe.model || 'All Models'}
-                        </p>
+                        <p className="text-md font-medium text-gray-600 flex items-center mt-2"><Camera className="w-4 h-4 mr-2 text-gray-500" /> {recipe.brand} &bull; {recipe.model || 'All Models'}</p>
                     </div>
                     <div className="flex space-x-3 items-center">
                         {isOwner && ( <>
@@ -211,12 +188,8 @@ const RecipeDetailModal = ({ recipe, isVisible, onClose, userId, toggleFavorite,
                             {recipe.imageUrl ? <img src={recipe.imageUrl} alt={recipe.name} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center bg-gray-100 text-gray-300"><ImageIcon className="w-10 h-10" /></div>}
                         </div>
                         <div className="flex w-full space-x-3 mt-auto">
-                            <button onClick={() => toggleFavorite(recipe.id, isFavorite)} className={`flex-1 flex items-center justify-center px-4 py-3 rounded-lg text-sm font-semibold transition-all ${isFavorite ? 'bg-[#FF654F] text-white' : 'bg-gray-100 text-gray-700 hover:bg-[#FF654F]/20'}`}>
-                                <Bookmark className={`w-4 h-4 mr-2 ${isFavorite ? 'fill-white' : 'fill-gray-600'}`} /> {isFavorite ? 'Bookmarked' : 'Bookmark'}
-                            </button>
-                            <button onClick={() => toggleEndorsement(recipe.id, isEndorsed)} className={`flex-1 flex items-center justify-center px-4 py-3 rounded-lg text-sm font-semibold transition-all ${isEndorsed ? 'bg-yellow-500 text-white' : 'bg-gray-100 text-gray-700 hover:bg-yellow-100'}`}>
-                                <Star className={`w-4 h-4 mr-2 ${isEndorsed ? 'fill-white' : 'fill-gray-500'}`} /> Endorse ({endorsementCount})
-                            </button>
+                            <button onClick={() => toggleFavorite(recipe.id, isFavorite)} className={`flex-1 flex items-center justify-center px-4 py-3 rounded-lg text-sm font-semibold transition-all ${isFavorite ? 'bg-[#FF654F] text-white' : 'bg-gray-100 text-gray-700 hover:bg-[#FF654F]/20'}`}><Bookmark className={`w-4 h-4 mr-2 ${isFavorite ? 'fill-white' : 'fill-gray-600'}`} /> {isFavorite ? 'Bookmarked' : 'Bookmark'}</button>
+                            <button onClick={() => toggleEndorsement(recipe.id, isEndorsed)} className={`flex-1 flex items-center justify-center px-4 py-3 rounded-lg text-sm font-semibold transition-all ${isEndorsed ? 'bg-yellow-500 text-white' : 'bg-gray-100 text-gray-700 hover:bg-yellow-100'}`}><Star className={`w-4 h-4 mr-2 ${isEndorsed ? 'fill-white' : 'fill-gray-500'}`} /> Endorse ({endorsementCount})</button>
                         </div>
                     </div>
                     <div className="lg:col-span-2 p-6">
@@ -225,8 +198,6 @@ const RecipeDetailModal = ({ recipe, isVisible, onClose, userId, toggleFavorite,
                             {allSettings.map(setting => (<div key={setting.key}><p className="text-xs font-bold uppercase text-gray-500 tracking-wider mb-0.5">{setting.label}</p><p className="text-lg font-mono font-medium text-gray-900">{setting.value}</p></div>))}
                         </div>
                     </div>
-                    
-                    {/* NOTES HIDDEN */}
                 </div>
             </div>
         </div>
@@ -268,13 +239,12 @@ const RecipeCard = ({ recipe, userId, isFavorite, toggleFavorite, toggleEndorsem
           {settingsWithValues.slice(0, 6).map((param) => (<div key={param.key} className="flex flex-col"><span className="font-semibold text-gray-500 text-[10px] uppercase tracking-wider">{getLabelForBrand(param.key, recipe.brand)}</span><span className="text-[#FF654F] font-medium font-mono truncate" title={recipe[param.key]}>{recipe[param.key]}</span></div>))}
           {settingsWithValues.length > 6 && (<div className="col-span-2 text-center pt-2"><span className="text-xs text-gray-400 italic">+{settingsWithValues.length - 6} more settings</span></div>)}
         </div>
-        {/* NOTES HIDDEN */}
       </div>
     </div>
   );
 };
 
-// --- UPDATED: FIX FOR IOS DOUBLE-TAP ---
+// --- UPDATED: STABLE INPUT (Fixes "Double Select" bug) ---
 const RecipeForm = ({ recipeData, isVisible, onClose, onSubmit, onInputChange, onBrandChange, onImageUpload, onClearImage, isProcessingImage, fileInputRef }) => {
     if (!isVisible) return null;
     const isEditing = !!recipeData.id;
@@ -287,16 +257,35 @@ const RecipeForm = ({ recipeData, isVisible, onClose, onSubmit, onInputChange, o
                 </div>
                 <form onSubmit={onSubmit} className="p-6 max-h-[80vh] overflow-y-auto">
                     <div className="mb-8">
+                        {/* KEY FIX: The file input is now OUTSIDE the conditional rendering. It always exists, just hidden or absolute. */}
                         <div className={`border-2 border-dashed rounded-xl flex flex-col items-center justify-center relative overflow-hidden h-48 bg-gray-50 ${recipeData.imageUrl ? 'border-[#FF654F]' : 'border-gray-300 hover:border-[#FF654F]'}`}>
+                            
+                            {/* 1. The Invisible Touch Target (Always on top) */}
+                            {!isProcessingImage && !recipeData.imageUrl && (
+                                <input 
+                                    type="file" 
+                                    ref={fileInputRef} 
+                                    accept="image/*" 
+                                    onChange={(e) => {
+                                        onImageUpload(e, fileInputRef);
+                                        // We clear value inside handleImageUpload, but doubling up here helps specific browser quirks
+                                    }} 
+                                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" 
+                                />
+                            )}
+
+                            {/* 2. The Visuals (Behind the input) */}
                             {isProcessingImage ? (
                                 <div className="text-[#FF654F] flex flex-col items-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#FF654F] mb-2"></div><span className="text-xs font-medium">Compressing...</span></div>
                             ) : recipeData.imageUrl ? (
-                                <React.Fragment><img src={recipeData.imageUrl} alt="Preview" className="absolute inset-0 w-full h-full object-cover" /><button type="button" onClick={() => { onClearImage(); if(fileInputRef.current) fileInputRef.current.value=null; }} className="absolute top-2 right-2 bg-red-500 text-white p-1.5 rounded-full shadow-lg hover:bg-red-600 transition"><X className="w-4 h-4" /></button></React.Fragment>
+                                <React.Fragment>
+                                    <img src={recipeData.imageUrl} alt="Preview" className="absolute inset-0 w-full h-full object-cover" />
+                                    <button type="button" onClick={() => { onClearImage(); if(fileInputRef.current) fileInputRef.current.value=null; }} className="absolute top-2 right-2 bg-red-500 text-white p-1.5 rounded-full shadow-lg hover:bg-red-600 transition z-20"><X className="w-4 h-4" /></button>
+                                </React.Fragment>
                             ) : (
-                                // FIX: Removed the onClick handler on the parent div to prevent double-firing events on iOS
-                                <div className="w-full h-full flex flex-col items-center justify-center relative">
-                                    <UploadCloud className="w-10 h-10 text-gray-300 mb-3" /><p className="text-sm text-gray-500 font-medium">Click to upload a photo</p>
-                                    <input type="file" ref={fileInputRef} accept="image/*" onChange={(e) => onImageUpload(e, fileInputRef)} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
+                                <div className="w-full h-full flex flex-col items-center justify-center">
+                                    <UploadCloud className="w-10 h-10 text-gray-300 mb-3" />
+                                    <p className="text-sm text-gray-500 font-medium">Click to upload a photo</p>
                                 </div>
                             )}
                         </div>
@@ -310,11 +299,8 @@ const RecipeForm = ({ recipeData, isVisible, onClose, onSubmit, onInputChange, o
                         <h3 className="text-sm font-bold text-[#FF654F] mb-4 flex items-center"><Aperture className="w-4 h-4 mr-2" />Settings ({recipeData.brand})</h3>
                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                             <div><label className="block text-xs font-medium text-gray-600 mb-1">{getLabelForBrand('baseProfile', recipeData.brand)} *</label><select name="baseProfile" value={recipeData.baseProfile} onChange={onInputChange} className="w-full text-sm border-gray-300 rounded-md focus:ring-[#FF654F] focus:border-[#FF654F]" required>{BASE_PROFILES_BY_BRAND[recipeData.brand]?.map(profile => <option key={profile} value={profile}>{profile}</option>)}</select></div>
-                            
                             {CORE_PARAMS_MAP.filter(p => p.key !== 'baseProfile').map(param => {
-                                // VISIBILITY CHECK
                                 if (!isFieldVisible(param, recipeData.brand)) return null;
-
                                 const options = BRAND_SPECIFIC_OPTIONS[recipeData.brand]?.[param.key];
                                 return (
                                   <div key={param.key}>
@@ -332,11 +318,6 @@ const RecipeForm = ({ recipeData, isVisible, onClose, onSubmit, onInputChange, o
                             })}
                         </div>
                     </div>
-                    
-                    {/* NOTES HIDDEN:
-                    <div className="mb-6"><label className="block text-xs font-bold uppercase text-gray-500 tracking-wider mb-1">Notes</label><textarea name="notes" rows="3" value={recipeData.notes} onChange={onInputChange} className="w-full border-gray-300 rounded-lg shadow-sm focus:ring-[#FF654F] focus:border-[#FF654F]" /></div>
-                    */}
-
                     <button type="submit" className="w-full py-4 bg-[#FF654F] hover:bg-red-500 text-white rounded-xl font-bold shadow-lg transform transition hover:-translate-y-0.5 flex justify-center items-center">{isEditing ? <Edit className="w-5 h-5 mr-2" /> : <PlusCircle className="w-5 h-5 mr-2" />}{isEditing ? 'Update Recipe' : 'Publish Recipe'}</button>
                 </form>
             </div>
