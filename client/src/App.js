@@ -95,7 +95,6 @@ const BRAND_MODELS = {
 
 const IMAGE_CONFIG = { maxWidth: 800, quality: 0.75, maxInputSizeMB: 10, outputFormat: 'image/jpeg' };
 
-// --- UPDATED: BRAND AWARENESS IN PARAMS ---
 const CORE_PARAMS_MAP = [
   { key: 'baseProfile', genericLabel: 'Base Profile / Simulation', labels: { 'Fujifilm': 'Film Simulation', 'Canon': 'Picture Style', 'Nikon': 'Picture Control', 'Sony': 'Creative Style / Look', 'Ricoh': 'Image Control', 'Olympus/OM System': 'Picture Mode' }},
   { key: 'dynamicRange', genericLabel: 'Dynamic Range', labels: { 'Fujifilm': 'DR Setting', 'Canon': 'ALO', 'Nikon': 'ADL', 'Sony': 'DRO / HDR', 'Ricoh': 'DR Comp.', 'Olympus/OM System': 'Gradation' }},
@@ -137,15 +136,12 @@ const compressImage = (file) => {
   return new Promise((resolve, reject) => {
     if (!file) return reject("No file provided");
     
-    // 1. Use createObjectURL (Pointer) instead of FileReader (Load into Memory)
-    // This is crucial for mobile Safari stability
     const objectUrl = URL.createObjectURL(file);
     const img = new Image();
     img.src = objectUrl;
     
     img.onload = () => {
-      // 2. Free memory immediately
-      URL.revokeObjectURL(objectUrl);
+      URL.revokeObjectURL(objectUrl); // Free memory
       
       const canvas = document.createElement('canvas');
       let width = img.width;
@@ -162,13 +158,12 @@ const compressImage = (file) => {
       const ctx = canvas.getContext('2d');
       ctx.drawImage(img, 0, 0, width, height);
 
-      // 3. Output compressed string
       resolve(canvas.toDataURL(IMAGE_CONFIG.outputFormat, IMAGE_CONFIG.quality));
     };
     
     img.onerror = (err) => {
         URL.revokeObjectURL(objectUrl);
-        reject("Image load failed. Try a smaller image or JPG format.");
+        reject("Image load failed.");
     };
   });
 };
@@ -226,16 +221,12 @@ const RecipeDetailModal = ({ recipe, isVisible, onClose, userId, toggleFavorite,
                     </div>
                     <div className="lg:col-span-2 p-6">
                         <h3 className="text-xl font-bold text-gray-800 mb-4 flex items-center"><Aperture className="w-5 h-5 mr-2 text-[#FF654F]" />Full Settings List</h3>
-                        {/* CHANGED: Using grid-cols-2 md:grid-cols-3 for denser packing on desktop */}
                         <div className="grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-6">
                             {allSettings.map(setting => (<div key={setting.key}><p className="text-xs font-bold uppercase text-gray-500 tracking-wider mb-0.5">{setting.label}</p><p className="text-lg font-mono font-medium text-gray-900">{setting.value}</p></div>))}
                         </div>
                     </div>
                     
-                    {/* NOTES HIDDEN: Code foundation preserved for future use
-                    {recipe.notes && <div className="lg:col-span-3 p-6 pt-0 border-t border-gray-100 lg:border-t-0"><h3 className="text-xl font-bold text-gray-800 mb-4 flex items-center"><Info className="w-5 h-5 mr-2 text-blue-500" />Creator Notes</h3><p className="text-sm text-gray-700 whitespace-pre-wrap">{recipe.notes}</p></div>}
-                    */}
-
+                    {/* NOTES HIDDEN */}
                 </div>
             </div>
         </div>
@@ -277,16 +268,13 @@ const RecipeCard = ({ recipe, userId, isFavorite, toggleFavorite, toggleEndorsem
           {settingsWithValues.slice(0, 6).map((param) => (<div key={param.key} className="flex flex-col"><span className="font-semibold text-gray-500 text-[10px] uppercase tracking-wider">{getLabelForBrand(param.key, recipe.brand)}</span><span className="text-[#FF654F] font-medium font-mono truncate" title={recipe[param.key]}>{recipe[param.key]}</span></div>))}
           {settingsWithValues.length > 6 && (<div className="col-span-2 text-center pt-2"><span className="text-xs text-gray-400 italic">+{settingsWithValues.length - 6} more settings</span></div>)}
         </div>
-        
-        {/* NOTES HIDDEN:
-        {recipe.notes && <div className="mt-auto pt-3 bg-gray-50 -mx-5 -mb-5 p-4 border-t border-gray-100"><p className="text-gray-600 text-xs italic line-clamp-3">"{recipe.notes}"</p></div>}
-        */}
-
+        {/* NOTES HIDDEN */}
       </div>
     </div>
   );
 };
 
+// --- UPDATED: FIX FOR IOS DOUBLE-TAP ---
 const RecipeForm = ({ recipeData, isVisible, onClose, onSubmit, onInputChange, onBrandChange, onImageUpload, onClearImage, isProcessingImage, fileInputRef }) => {
     if (!isVisible) return null;
     const isEditing = !!recipeData.id;
@@ -305,7 +293,8 @@ const RecipeForm = ({ recipeData, isVisible, onClose, onSubmit, onInputChange, o
                             ) : recipeData.imageUrl ? (
                                 <React.Fragment><img src={recipeData.imageUrl} alt="Preview" className="absolute inset-0 w-full h-full object-cover" /><button type="button" onClick={() => { onClearImage(); if(fileInputRef.current) fileInputRef.current.value=null; }} className="absolute top-2 right-2 bg-red-500 text-white p-1.5 rounded-full shadow-lg hover:bg-red-600 transition"><X className="w-4 h-4" /></button></React.Fragment>
                             ) : (
-                                <div className="w-full h-full flex flex-col items-center justify-center" onClick={() => fileInputRef.current && fileInputRef.current.click()}>
+                                // FIX: Removed the onClick handler on the parent div to prevent double-firing events on iOS
+                                <div className="w-full h-full flex flex-col items-center justify-center relative">
                                     <UploadCloud className="w-10 h-10 text-gray-300 mb-3" /><p className="text-sm text-gray-500 font-medium">Click to upload a photo</p>
                                     <input type="file" ref={fileInputRef} accept="image/*" onChange={(e) => onImageUpload(e, fileInputRef)} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
                                 </div>
@@ -487,12 +476,15 @@ function App() {
   const handleImageUpload = async (e, inputRef) => {
     const file = e.target.files[0];
     if (!file) return;
-    if (inputRef.current) inputRef.current.value = null;
+    
     setIsProcessingImage(true);
     try {
       const url = await compressImage(file);
       (editingRecipe ? setEditingRecipe : setNewRecipe)(prev => ({ ...prev, imageUrl: url }));
     } catch (e) { showCustomError("Image failed."); }
+    
+    // Clear the input value safely AFTER processing
+    if (inputRef.current) inputRef.current.value = null;
     setIsProcessingImage(false);
   };
 
