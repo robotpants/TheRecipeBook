@@ -28,7 +28,7 @@ const firebaseConfig = {
 // ---------------------------------------
 // 1. CONSTANTS & DATA MODELS
 // ---------------------------------------
-const APP_VERSION = 'v0.1.002';
+const APP_VERSION = 'v0.1.003';
 const RECIPES_COLLECTION_PATH = 'public_recipes'; 
 const SITE_TITLE = 'The Recipe Book'; 
 
@@ -117,6 +117,7 @@ const CORE_PARAMS_MAP = [
   { key: 'noiseReduction', genericLabel: 'Noise Reduction', labels: { 'Fujifilm': 'High ISO NR', 'Canon': 'High ISO NR', 'Nikon': 'High ISO NR', 'Sony': 'High ISO NR', 'Ricoh': 'High ISO NR', 'Olympus/OM System': 'Noise Filter' }},
   { key: 'clarity', genericLabel: 'Clarity', labels: { 'Fujifilm': 'Clarity', 'Canon': 'Clarity', 'Nikon': 'Clarity', 'Sony': 'Clarity', 'Ricoh': 'Clarity', 'Olympus/OM System': 'Midtones' }},
   
+  // --- BRAND SPECIFIC FIELDS ---
   { key: 'grainEffect', genericLabel: 'Grain Effect', supportedBrands: ['Fujifilm'], labels: { 'Fujifilm': 'Grain Effect' } },
   { key: 'chromeEffect', genericLabel: 'Color Chrome Effect', supportedBrands: ['Fujifilm'], labels: { 'Fujifilm': 'Color Chrome Effect' } },
   { key: 'chromeBlue', genericLabel: 'Color Chrome FX Blue', supportedBrands: ['Fujifilm'], labels: { 'Fujifilm': 'Color Chrome FX Blue' } },
@@ -181,7 +182,7 @@ const AuthModal = ({ isVisible, onClose, auth, showCustomError }) => {
             if (isSignUp) {
                 const userCredential = await createUserWithEmailAndPassword(auth, email, password);
                 await updateProfile(userCredential.user, { displayName: name });
-                window.location.reload(); // Force reload to update UI state cleanly
+                window.location.reload(); 
             } else {
                 await signInWithEmailAndPassword(auth, email, password);
                 onClose();
@@ -215,7 +216,6 @@ const AuthModal = ({ isVisible, onClose, auth, showCustomError }) => {
                         <p className="text-gray-500 text-sm mt-1">Save your recipes across all devices.</p>
                     </div>
 
-                    {/* Google Button */}
                     <button onClick={handleGoogle} className="w-full bg-white border border-gray-300 text-gray-700 font-bold py-3 rounded-xl flex items-center justify-center hover:bg-gray-50 transition mb-6">
                         <User className="w-5 h-5 mr-2" /> Continue with Google
                     </button>
@@ -225,7 +225,6 @@ const AuthModal = ({ isVisible, onClose, auth, showCustomError }) => {
                         <div className="relative flex justify-center text-sm"><span className="px-2 bg-white text-gray-500">Or with email</span></div>
                     </div>
 
-                    {/* Email Form */}
                     <form onSubmit={handleEmailAuth} className="space-y-4">
                         {isSignUp && (
                             <div>
@@ -382,6 +381,7 @@ const RecipeCard = ({ recipe, userId, isFavorite, toggleFavorite, toggleEndorsem
   );
 };
 
+// --- UPDATED: STABLE INPUT ---
 const RecipeForm = ({ recipeData, isVisible, onClose, onSubmit, onInputChange, onBrandChange, onImageUpload, onClearImage, isProcessingImage, fileInputRef }) => {
     if (!isVisible) return null;
     const isEditing = !!recipeData.id;
@@ -476,7 +476,7 @@ function App() {
   const [db, setDb] = useState(null);
   const [auth, setAuth] = useState(null);
   const [userId, setUserId] = useState(null);
-  const [userProfile, setUserProfile] = useState(null); // Track Login Status
+  const [userProfile, setUserProfile] = useState(null); 
   const [recipes, setRecipes] = useState([]);
   const [favoriteRecipeIds, setFavoriteRecipeIds] = useState(new Set());
   const [loading, setLoading] = useState(true);
@@ -486,7 +486,7 @@ function App() {
   const [isFormVisible, setIsFormVisible] = useState(false);
   const [isDebugMenuOpen, setIsDebugMenuOpen] = useState(false);
   const [isAboutOpen, setIsAboutOpen] = useState(false); 
-  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false); // NEW
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
 
   const [newRecipe, setNewRecipe] = useState(initialFormState);
   const [editingRecipe, setEditingRecipe] = useState(null);
@@ -509,10 +509,11 @@ function App() {
       onAuthStateChanged(firebaseAuth, async (user) => {
         if (user) {
           setUserId(user.uid);
+          // Check if Anon or Real
           if (!user.isAnonymous) {
               setUserProfile({ name: user.displayName || user.email, photo: user.photoURL });
           } else {
-              setUserProfile(null); // Guest
+              setUserProfile(null); // Still null for guests
           }
         } else {
            try { const cred = await signInAnonymously(firebaseAuth); setUserId(cred.user.uid); setUserProfile(null); } 
@@ -525,12 +526,7 @@ function App() {
 
   const handleSignOut = async () => {
       if (!auth) return;
-      try {
-          await signOut(auth);
-          window.location.reload(); 
-      } catch (error) {
-          console.error(error);
-      }
+      try { await signOut(auth); window.location.reload(); } catch (error) { console.error(error); }
   };
 
   // --- DATA FETCHING ---
@@ -552,13 +548,13 @@ function App() {
 
   // --- ACTIONS ---
   const toggleFavorite = async (recipeId, isFavorite) => {
-    if (!db || !userId) return showCustomError("Auth required.");
+    if (!userProfile) { setIsAuthModalOpen(true); return; } // FORCE LOGIN
     const ref = doc(db, `users/${userId}/favorites`, recipeId);
     isFavorite ? await deleteDoc(ref) : await setDoc(ref, { favoritedAt: serverTimestamp(), recipeId });
   };
 
   const toggleEndorsement = async (recipeId, isEndorsed) => {
-    if (!db || !userId) return showCustomError("Auth required.");
+    if (!userProfile) { setIsAuthModalOpen(true); return; } // FORCE LOGIN
     const ref = doc(db, RECIPES_COLLECTION_PATH, recipeId);
     await updateDoc(ref, { endorserIds: isEndorsed ? arrayRemove(userId) : arrayUnion(userId) });
   };
@@ -670,13 +666,31 @@ function App() {
                    </button>
                )}
                
-               <button onClick={() => setIsDebugMenuOpen(true)} className="p-2 rounded-full text-gray-700 hover:bg-gray-100 transition"><Settings className="w-5 h-5" /></button>
-               <button onClick={() => {setEditingRecipe(null); setIsFormVisible(true);}} className="bg-gray-900 text-white px-4 py-2 rounded-full text-sm font-semibold hover:bg-gray-800 transition flex items-center shadow-md"><PlusCircle className="w-4 h-4 mr-2" />New Recipe</button>
+               {/* ADMIN ONLY: Debug Menu */}
+               {userProfile && <button onClick={() => setIsDebugMenuOpen(true)} className="p-2 rounded-full text-gray-700 hover:bg-gray-100 transition"><Settings className="w-5 h-5" /></button>}
+               
+               {/* NEW RECIPE: Visible to all, but triggers login for guests */}
+               <button 
+                  onClick={() => {
+                    if (userProfile) {
+                        setEditingRecipe(null); 
+                        setIsFormVisible(true);
+                    } else {
+                        setIsAuthModalOpen(true);
+                    }
+                  }}
+                  className="bg-gray-900 text-white px-4 py-2 rounded-full text-sm font-semibold hover:bg-gray-800 transition flex items-center shadow-md"
+               >
+                 <PlusCircle className="w-4 h-4 mr-2" />New Recipe
+               </button>
             </div>
           </div>
         </header>
         {error && <div className="fixed top-20 left-1/2 transform -translate-x-1/2 z-50 px-6 py-3 bg-red-500 text-white rounded-full shadow-xl text-sm font-medium animate-bounce">{error}</div>}
         <main className="max-w-7xl mx-auto px-4 py-8">
+          
+          {/* WELCOME BANNER REMOVED PER REQUEST */}
+
           <div className="flex flex-col md:flex-row gap-4 mb-8">
             <div className="relative flex-1"><Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" /><input type="text" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder="Search recipes..." className="w-full pl-12 pr-4 py-3 rounded-xl border-none bg-white shadow-sm focus:ring-2 focus:ring-[#FF654F]" /></div>
             <div className="flex gap-2 overflow-x-auto pb-2 md:pb-0 hide-scrollbar">
