@@ -18,10 +18,13 @@ const firebaseConfig = {
 // ---------------------------------------
 // 1. CONSTANTS & DATA MODELS
 // ---------------------------------------
-// We use the appId from the user's key to segment data if needed, 
-// but for now we keep the path simple.
-const RECIPES_COLLECTION_PATH = 'public_recipes'; // Simplified for your live app
+const appId = 'default-app-id';
+const RECIPES_COLLECTION_PATH = 'public_recipes'; 
 const SITE_TITLE = 'The Recipe Book'; 
+
+// Helper to generate number ranges (e.g. -4 to +4)
+const range = (start, end) => Array.from({length: end - start + 1}, (_, i) => (start + i).toString());
+const plusRange = (start, end) => Array.from({length: end - start + 1}, (_, i) => (start + i) > 0 ? `+${start + i}` : (start + i).toString());
 
 const BASE_PROFILES_BY_BRAND = {
     'Fujifilm': ['PROVIA/Standard', 'Velvia/Vivid', 'ASTIA/Soft', 'Classic Chrome', 'ETERNA/Cinema', 'ETERNA Bleach Bypass', 'Classic Neg.', 'Nostalgic Negative', 'ACROS', 'ACROS + Ye Filter', 'ACROS + R Filter', 'ACROS + G Filter', 'Black & White', 'B&W + Filter', 'Sepia', 'Reala ACE'],
@@ -30,6 +33,50 @@ const BASE_PROFILES_BY_BRAND = {
     'Sony': ['ST (Standard)', 'PT (Portrait)', 'LA (Landscape)', 'VV (Vivid)', 'Clear', 'Deep', 'Light', 'M (Sepia)', 'W (Black/White)', 'Creative Look (FL)', 'Creative Look (IN)', 'Creative Look (SH)'],
     'Ricoh': ['GR IIIx', 'GR III', 'GR II'],
     'Olympus/OM System': ['i-Enhance', 'Vivid', 'Natural', 'Muted', 'Portrait', 'Monotone', 'Custom1', 'Custom2', 'Sepia', 'Art Filter (Various)']
+};
+
+// --- NEW: SMART OPTIONS PER BRAND ---
+const BRAND_SPECIFIC_OPTIONS = {
+    'Fujifilm': {
+        dynamicRange: ['DR100', 'DR200', 'DR400', 'DR-P (Strong)', 'DR-P (Weak)', 'Auto', 'Off'],
+        highlightTone: plusRange(-2, 4), // -2 to +4
+        shadowTone: plusRange(-2, 4),
+        colorSaturation: plusRange(-4, 4),
+        sharpness: plusRange(-4, 4),
+        noiseReduction: plusRange(-4, 4),
+        clarity: plusRange(-5, 5),
+        wbShift: [] // Keep as text for now as it's complex (R:X B:Y)
+    },
+    'Nikon': {
+        dynamicRange: ['Auto', 'Extra High', 'High', 'Normal', 'Low', 'Off'], // ADL
+        sharpening: range(0, 9),
+        clarity: plusRange(-5, 5),
+        contrast: plusRange(-3, 3),
+        brightness: plusRange(-5, 5),
+        saturation: plusRange(-3, 3),
+        hue: plusRange(-3, 3),
+        noiseReduction: ['Off', 'Low', 'Normal', 'High']
+    },
+    'Canon': {
+        dynamicRange: ['Disable', 'Low', 'Standard', 'High'], // ALO
+        sharpness: range(0, 7),
+        contrast: range(-4, 4),
+        saturation: range(-4, 4),
+        colorTone: range(-4, 4),
+        noiseReduction: ['Disable', 'Low', 'Standard', 'High', 'Multi Shot']
+    },
+    'Sony': {
+        dynamicRange: ['Off', 'Auto', 'Lv1', 'Lv2', 'Lv3', 'Lv4', 'Lv5'], // DRO
+        sharpness: range(0, 9), // Creative Look ranges vary, sticking to generic wide range
+        clarity: range(0, 9),
+        noiseReduction: ['Off', 'Low', 'Normal']
+    },
+    'Ricoh': {
+        dynamicRange: ['Off', 'Auto', 'Weak', 'Medium', 'Strong'],
+        sharpness: range(-4, 4),
+        contrast: range(-4, 4),
+        clarity: range(-4, 4),
+    }
 };
 
 const ALL_BRANDS = Object.keys(BASE_PROFILES_BY_BRAND);
@@ -231,7 +278,22 @@ const RecipeForm = ({ recipeData, isVisible, onClose, onSubmit, onInputChange, o
                         <h3 className="text-sm font-bold text-[#FF654F] mb-4 flex items-center"><Aperture className="w-4 h-4 mr-2" />Settings ({recipeData.brand})</h3>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div><label className="block text-xs font-medium text-gray-600 mb-1">{getLabelForBrand('baseProfile', recipeData.brand)} *</label><select name="baseProfile" value={recipeData.baseProfile} onChange={onInputChange} className="w-full text-sm border-gray-300 rounded-md focus:ring-[#FF654F] focus:border-[#FF654F]" required>{BASE_PROFILES_BY_BRAND[recipeData.brand]?.map(profile => <option key={profile} value={profile}>{profile}</option>)}</select></div>
-                            {CORE_PARAMS_MAP.filter(p => p.key !== 'baseProfile').map(param => (<div key={param.key}><label className="block text-xs font-medium text-gray-600 mb-1">{param.genericLabel.split('/')[0].trim()}</label><input type="text" name={param.key} value={recipeData[param.key]} onChange={onInputChange} className="w-full text-sm border-gray-300 rounded-md focus:ring-[#FF654F] focus:border-[#FF654F]" /></div>))}
+                            {CORE_PARAMS_MAP.filter(p => p.key !== 'baseProfile').map(param => {
+                                const options = BRAND_SPECIFIC_OPTIONS[recipeData.brand]?.[param.key];
+                                return (
+                                  <div key={param.key}>
+                                    <label className="block text-xs font-medium text-gray-600 mb-1">{param.genericLabel.split('/')[0].trim()}</label>
+                                    {options ? (
+                                      <select name={param.key} value={recipeData[param.key]} onChange={onInputChange} className="w-full text-sm border-gray-300 rounded-md focus:ring-[#FF654F] focus:border-[#FF654F]">
+                                        <option value="">Select...</option>
+                                        {options.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                                      </select>
+                                    ) : (
+                                      <input type="text" name={param.key} value={recipeData[param.key]} onChange={onInputChange} className="w-full text-sm border-gray-300 rounded-md focus:ring-[#FF654F] focus:border-[#FF654F]" placeholder="Value..." />
+                                    )}
+                                  </div>
+                                );
+                            })}
                         </div>
                     </div>
                     <div className="mb-6"><label className="block text-xs font-bold uppercase text-gray-500 tracking-wider mb-1">Notes</label><textarea name="notes" rows="3" value={recipeData.notes} onChange={onInputChange} className="w-full border-gray-300 rounded-lg shadow-sm focus:ring-[#FF654F] focus:border-[#FF654F]" /></div>
