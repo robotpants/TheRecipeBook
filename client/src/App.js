@@ -31,7 +31,8 @@ const BASE_PROFILES_BY_BRAND = {
     'Canon': ['Standard', 'Portrait', 'Landscape', 'Fine Detail', 'Neutral', 'Faithful', 'Monochrome'],
     'Nikon': ['Standard', 'Portrait', 'Landscape', 'Flat', 'Dream', 'Morning', 'Pop', 'Sunday', 'Somber', 'Dramatic', 'Silence', 'Bleached', 'Melancholic', 'Pure', 'Denim', 'Toy', 'Sepia', 'Blue', 'Red', 'Pink', 'Charcoal', 'Graphite', 'Binary', 'Carbon'],
     'Sony': ['ST (Standard)', 'PT (Portrait)', 'LA (Landscape)', 'VV (Vivid)', 'Clear', 'Deep', 'Light', 'M (Sepia)', 'W (Black/White)', 'Creative Look (FL)', 'Creative Look (IN)', 'Creative Look (SH)'],
-    'Ricoh': ['GR IIIx', 'GR III', 'GR II'],
+    // FIXED: Real Ricoh Image Controls
+    'Ricoh': ['Standard', 'Vivid', 'Monotone', 'Soft Monotone', 'Hard Monotone', 'Hi-Contrast B&W', 'Negative Film', 'Positive Film', 'Bleach Bypass', 'Retro', 'HDR Tone', 'Cross Process'],
     'Olympus/OM System': ['i-Enhance', 'Vivid', 'Natural', 'Muted', 'Portrait', 'Monotone', 'Custom1', 'Custom2', 'Sepia', 'Art Filter (Various)']
 };
 
