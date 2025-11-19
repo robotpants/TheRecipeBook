@@ -14,7 +14,27 @@ import {
 import { getFirestore, collection, onSnapshot, query, addDoc, setDoc, doc, deleteDoc, updateDoc, arrayUnion, arrayRemove, serverTimestamp, getDocs, writeBatch } from 'firebase/firestore';
 import { Camera, Image as ImageIcon, PlusCircle, Aperture, Search, Zap, UploadCloud, X, Settings, Bookmark, MoreVertical, Edit, Trash2, Bug, AlertTriangle, Info, LogOut, User, Mail, Lock, ChevronRight, Shield, Flame, Rocket } from 'lucide-react';
 
+// Import Config and Data from the new file
+import {
+    APP_VERSION,
+    RECIPES_COLLECTION_PATH,
+    SITE_TITLE,
+    ADMIN_EMAILS,
+    BASE_PROFILES_BY_BRAND,
+    BRAND_SPECIFIC_OPTIONS,
+    ALL_BRANDS,
+    DEFAULT_BRAND,
+    BRAND_MODELS,
+    IMAGE_CONFIG,
+    CORE_PARAMS_MAP,
+    initialFormState,
+    getLabelForBrand,
+    isFieldVisible,
+    formatBrandName
+} from './cameraConfig';
+
 // --- CONFIGURATION ---
+// Note: In production, these keys are handled via Vercel env variables.
 const firebaseConfig = {
   apiKey: "AIzaSyDwNm5YCEjmkVIjTbj9qvlj5KOptuEld48",
   authDomain: "the-recipe-book-5408d.firebaseapp.com",
@@ -25,152 +45,7 @@ const firebaseConfig = {
   measurementId: "G-N5QVD88JG9"
 };
 
-// ---------------------------------------
-// 1. CONSTANTS & DATA MODELS
-// ---------------------------------------
-const APP_VERSION = 'v0.1.014'; 
-const RECIPES_COLLECTION_PATH = 'public_recipes'; 
-const SITE_TITLE = 'The Recipe Book'; 
-
-// ✅ ADMIN CONFIGURATION
-const ADMIN_EMAILS = ['nick@thegoodok.com']; 
-
-// Helper to generate number ranges
-const range = (start, end) => Array.from({length: end - start + 1}, (_, i) => (start + i).toString());
-const plusRange = (start, end) => Array.from({length: end - start + 1}, (_, i) => (start + i) > 0 ? `+${start + i}` : (start + i).toString());
-
-const BASE_PROFILES_BY_BRAND = {
-    'Fujifilm': ['PROVIA/Standard', 'Velvia/Vivid', 'ASTIA/Soft', 'Classic Chrome', 'ETERNA/Cinema', 'ETERNA Bleach Bypass', 'Classic Neg.', 'Nostalgic Negative', 'ACROS', 'ACROS + Ye Filter', 'ACROS + R Filter', 'ACROS + G Filter', 'Black & White', 'B&W + Filter', 'Sepia', 'Reala ACE'],
-    'Canon': ['Standard', 'Portrait', 'Landscape', 'Fine Detail', 'Neutral', 'Faithful', 'Monochrome'],
-    'Nikon': ['Standard', 'Portrait', 'Landscape', 'Flat', 'Dream', 'Morning', 'Pop', 'Sunday', 'Somber', 'Dramatic', 'Silence', 'Bleached', 'Melancholic', 'Pure', 'Denim', 'Toy', 'Sepia', 'Blue', 'Red', 'Pink', 'Charcoal', 'Graphite', 'Binary', 'Carbon'],
-    'Sony': ['ST (Standard)', 'PT (Portrait)', 'LA (Landscape)', 'VV (Vivid)', 'Clear', 'Deep', 'Light', 'M (Sepia)', 'W (Black/White)', 'Creative Look (FL)', 'Creative Look (IN)', 'Creative Look (SH)'],
-    'Ricoh': ['Standard', 'Vivid', 'Monotone', 'Soft Monotone', 'Hard Monotone', 'Hi-Contrast B&W', 'Negative Film', 'Positive Film', 'Bleach Bypass', 'Retro', 'HDR Tone', 'Cross Process'],
-    'Olympus/OM': ['i-Enhance', 'Vivid', 'Natural', 'Muted', 'Portrait', 'Monotone', 'Custom1', 'Custom2', 'Sepia', 'Art Filter (Various)']
-};
-
-// --- SMART OPTIONS PER BRAND ---
-const BRAND_SPECIFIC_OPTIONS = {
-    'Fujifilm': {
-        whiteBalance: ['Auto', 'Custom', 'Color Temperature (K)', 'Daylight', 'Shade', 'Fluorescent 1', 'Fluorescent 2', 'Fluorescent 3', 'Incandescent', 'Underwater'],
-        dynamicRange: ['DR100', 'DR200', 'DR400', 'DR-P (Strong)', 'DR-P (Weak)', 'Auto', 'Off'],
-        highlightTone: plusRange(-2, 4),
-        shadowTone: plusRange(-2, 4),
-        colorSaturation: plusRange(-4, 4),
-        sharpness: plusRange(-4, 4),
-        noiseReduction: plusRange(-4, 4),
-        clarity: plusRange(-5, 5),
-        grainEffect: ['Off', 'Weak Small', 'Weak Large', 'Strong Small', 'Strong Large'],
-        chromeEffect: ['Off', 'Weak', 'Strong'],
-        chromeBlue: ['Off', 'Weak', 'Strong'],
-    },
-    'Nikon': {
-        whiteBalance: ['Auto', 'Natural Light Auto', 'Direct Sunlight', 'Cloudy', 'Shade', 'Incandescent', 'Fluorescent', 'Flash', 'Choose Color Temp', 'Preset Manual'],
-        dynamicRange: ['Auto', 'Extra High', 'High', 'Normal', 'Low', 'Off'], // ADL
-        sharpening: range(0, 9),
-        clarity: plusRange(-5, 5),
-        contrast: plusRange(-3, 3),
-        brightness: plusRange(-5, 5),
-        saturation: plusRange(-3, 3),
-        hue: plusRange(-3, 3),
-        noiseReduction: ['Off', 'Low', 'Normal', 'High']
-    },
-    'Canon': {
-        whiteBalance: ['Auto', 'Daylight', 'Shade', 'Cloudy', 'Tungsten', 'White Fluorescent', 'Flash', 'Custom', 'Color Temp'],
-        dynamicRange: ['Disable', 'Low', 'Standard', 'High'], // ALO
-        sharpness: range(0, 7),
-        contrast: range(-4, 4),
-        saturation: range(-4, 4),
-        colorTone: range(-4, 4),
-        noiseReduction: ['Disable', 'Low', 'Standard', 'High', 'Multi Shot'],
-        clarity: range(-4, 4)
-    },
-    'Sony': {
-        whiteBalance: ['Auto', 'Daylight', 'Shade', 'Cloudy', 'Incandescent', 'Fluor.: Warm White', 'Fluor.: Cool White', 'Fluor.: Day White', 'Fluor.: Daylight', 'Flash', 'Underwater', 'C.Temp./Filter', 'Custom'],
-        dynamicRange: ['Off', 'Auto', 'Lv1', 'Lv2', 'Lv3', 'Lv4', 'Lv5'], // DRO
-        sharpness: range(0, 9),
-        clarity: range(0, 9),
-        noiseReduction: ['Off', 'Low', 'Normal'],
-        highlightTone: range(-9, 9),
-        shadowTone: range(-9, 9),
-        colorSaturation: range(-9, 9)
-    },
-    'Ricoh': {
-        whiteBalance: ['Auto', 'Multi Auto', 'Daylight', 'Shade', 'Cloudy', 'Fl. Daylight', 'Fl. Neutral White', 'Fl. Cool White', 'Fl. Warm White', 'Tungsten', 'CTE', 'Manual', 'Color Temp'],
-        dynamicRange: ['Off', 'Auto', 'Weak', 'Medium', 'Strong'],
-        sharpness: range(-4, 4),
-        contrast: range(-4, 4),
-        clarity: range(-4, 4),
-        highlightTone: range(-4, 4),
-        shadowTone: range(-4, 4),
-        colorSaturation: range(-4, 4),
-        noiseReduction: ['Off', 'Low', 'High', 'Auto']
-    },
-    'Olympus/OM': {
-        whiteBalance: ['Auto', 'Sunny', 'Shadow', 'Cloudy', 'Incandescent', 'Fluorescent', 'Underwater', 'Flash', 'Custom', 'Color Temp'],
-        dynamicRange: ['Auto', 'Normal', 'High Key', 'Low Key'],
-        highlightTone: range(-7, 7),
-        shadowTone: range(-7, 7),
-        sharpness: range(-2, 2),
-        colorSaturation: range(-2, 2),
-        noiseReduction: ['Off', 'Low', 'Standard', 'High']
-    }
-};
-
-const ALL_BRANDS = Object.keys(BASE_PROFILES_BY_BRAND);
-const DEFAULT_BRAND = 'Fujifilm'; 
-
-const BRAND_MODELS = {
-    'Fujifilm': ['X100VI', 'X100V', 'X-T5', 'X-T4', 'X-H2S', 'X-H2', 'X-S20', 'X-S10', 'X-Pro3', 'X-E4', 'X-T30 II', 'X-T30', 'GFX 100 II', 'GFX 50S II', 'GFX 100S'],
-    'Canon': ['EOS R3', 'EOS R5', 'EOS R6 II', 'EOS R6', 'EOS R8', 'EOS R7', 'EOS R10', 'EOS R50', 'EOS R', 'EOS RP', 'EOS 90D', 'EOS M50 II', 'EOS M6 II'],
-    'Nikon': ['Z9', 'Z8', 'Z7 II', 'Z6 II', 'Zf', 'Zfc', 'Z5', 'Z50', 'Z30', 'D850', 'D780', 'D500'],
-    'Sony': ['A1', 'A9 III', 'A7S III', 'A7R V', 'A7R IV', 'A7 IV', 'A7C II', 'A7CR', 'A6700', 'A6600', 'ZV-E10', 'ZV-1 II'],
-    'Ricoh': ['GR IIIx', 'GR III', 'GR II'],
-    'Olympus/OM': ['OM-1 II', 'OM-1', 'OM-5', 'E-M1 Mark III', 'E-M5 Mark III', 'E-M10 Mark IV'],
-};
-
-const IMAGE_CONFIG = { maxWidth: 800, quality: 0.75, maxInputSizeMB: 10, outputFormat: 'image/jpeg' };
-
-const CORE_PARAMS_MAP = [
-  { key: 'baseProfile', genericLabel: 'Base Profile / Simulation', labels: { 'Fujifilm': 'Film Simulation', 'Canon': 'Picture Style', 'Nikon': 'Picture Control', 'Sony': 'Creative Style / Look', 'Ricoh': 'Image Control', 'Olympus/OM': 'Picture Mode' }},
-  { key: 'dynamicRange', genericLabel: 'Dynamic Range', labels: { 'Fujifilm': 'DR Setting', 'Canon': 'ALO', 'Nikon': 'ADL', 'Sony': 'DRO / HDR', 'Ricoh': 'DR Comp.', 'Olympus/OM': 'Gradation' }},
-  { key: 'whiteBalance', genericLabel: 'White Balance', labels: { 'Fujifilm': 'WB Preset', 'Canon': 'WB Preset', 'Nikon': 'WB Preset', 'Sony': 'WB Preset', 'Ricoh': 'WB Preset', 'Olympus/OM': 'WB Preset' }},
-  { key: 'wbShift', genericLabel: 'WB Shift', labels: { 'Fujifilm': 'WB Shift', 'Canon': 'Color Tone', 'Nikon': 'WB Adjust', 'Sony': 'Color Phase', 'Ricoh': 'WB Adj', 'Olympus/OM': 'WB Custom Adj' }},
-  { key: 'highlightTone', genericLabel: 'Highlights', labels: { 'Fujifilm': 'Highlight Tone', 'Canon': 'Contrast (Hi)', 'Nikon': 'Highlights', 'Sony': 'Highlights', 'Ricoh': 'Contrast (Hi)', 'Olympus/OM': 'Highlight' }},
-  { key: 'shadowTone', genericLabel: 'Shadows', labels: { 'Fujifilm': 'Shadow Tone', 'Canon': 'Contrast (Lo)', 'Nikon': 'Shadows', 'Sony': 'Shadows', 'Ricoh': 'Contrast (Lo)', 'Olympus/OM': 'Shadow' }},
-  { key: 'colorSaturation', genericLabel: 'Color', labels: { 'Fujifilm': 'Color', 'Canon': 'Saturation', 'Nikon': 'Saturation', 'Sony': 'Saturation', 'Ricoh': 'Saturation', 'Olympus/OM': 'Color' }},
-  { key: 'sharpness', genericLabel: 'Sharpness', labels: { 'Fujifilm': 'Sharpness', 'Canon': 'Sharpness', 'Nikon': 'Sharpening', 'Sony': 'Sharpening', 'Ricoh': 'Sharpness', 'Olympus/OM': 'Sharpness' }},
-  { key: 'noiseReduction', genericLabel: 'Noise Reduction', labels: { 'Fujifilm': 'High ISO NR', 'Canon': 'High ISO NR', 'Nikon': 'High ISO NR', 'Sony': 'High ISO NR', 'Ricoh': 'High ISO NR', 'Olympus/OM': 'Noise Filter' }},
-  { key: 'clarity', genericLabel: 'Clarity', labels: { 'Fujifilm': 'Clarity', 'Canon': 'Clarity', 'Nikon': 'Clarity', 'Sony': 'Clarity', 'Ricoh': 'Clarity', 'Olympus/OM': 'Midtones' }},
-  
-  // --- BRAND SPECIFIC FIELDS ---
-  { key: 'grainEffect', genericLabel: 'Grain Effect', supportedBrands: ['Fujifilm'], labels: { 'Fujifilm': 'Grain Effect' } },
-  { key: 'chromeEffect', genericLabel: 'Color Chrome Effect', supportedBrands: ['Fujifilm'], labels: { 'Fujifilm': 'Color Chrome Effect' } },
-  { key: 'chromeBlue', genericLabel: 'Color Chrome FX Blue', supportedBrands: ['Fujifilm'], labels: { 'Fujifilm': 'Color Chrome FX Blue' } },
-];
-
-const initialFormState = {
-  name: '', brand: DEFAULT_BRAND, model: BRAND_MODELS[DEFAULT_BRAND][0], notes: '', imageUrl: '', endorserIds: [],
-  baseProfile: BASE_PROFILES_BY_BRAND[DEFAULT_BRAND][0],
-  ...CORE_PARAMS_MAP.filter(p => p.key !== 'baseProfile').reduce((acc, param) => ({ ...acc, [param.key]: '' }), {}),
-};
-
-const getLabelForBrand = (key, brand) => {
-  const param = CORE_PARAMS_MAP.find(p => p.key === key);
-  if (!param) return key;
-  return param.labels[brand] || param.genericLabel.split('/')[0].trim();
-};
-
-const isFieldVisible = (param, currentBrand) => {
-    if (!param.supportedBrands) return true; 
-    return param.supportedBrands.includes(currentBrand);
-};
-
-// --- UI HELPERS ---
-const formatBrandName = (brand) => {
-    if (brand === 'Olympus/OM System') return 'Olympus/OM';
-    return brand;
-};
-
+// --- UTILITY FUNCTIONS (Logic based) ---
 const compressImage = (file) => {
   return new Promise((resolve, reject) => {
     if (!file) return reject("No file provided");
@@ -320,7 +195,6 @@ const RecipeDetailModal = ({ recipe, isVisible, onClose, userId, isAdmin, toggle
     const isOwner = recipe.userId === userId;
     const isFavorite = recipe.isFavorite || false;
 
-    // ✅ ADMIN POWER: Can edit/delete if Owner OR Admin
     const canModify = isAdmin || isOwner;
 
     const allSettings = CORE_PARAMS_MAP
@@ -366,11 +240,6 @@ const RecipeDetailModal = ({ recipe, isVisible, onClose, userId, isAdmin, toggle
                             {allSettings.map(setting => (<div key={setting.key}><p className="text-xs font-bold uppercase text-gray-500 tracking-wider mb-0.5">{setting.label}</p><p className="text-lg font-mono font-medium text-gray-900">{setting.value}</p></div>))}
                         </div>
                     </div>
-                    
-                    {/* NOTES HIDDEN: Code foundation preserved for future use
-                    {recipe.notes && <div className="lg:col-span-3 p-6 pt-0 border-t border-gray-100 lg:border-t-0"><h3 className="text-xl font-bold text-gray-800 mb-4 flex items-center"><Info className="w-5 h-5 mr-2 text-blue-500" />Creator Notes</h3><p className="text-sm text-gray-700 whitespace-pre-wrap">{recipe.notes}</p></div>}
-                    */}
-
                 </div>
             </div>
         </div>
@@ -404,7 +273,6 @@ const RecipeCard = ({ recipe, userId, isAdmin, isFavorite, toggleFavorite, toggl
             <button onClick={(e) => { e.stopPropagation(); toggleEndorsement(recipe.id, isEndorsed); }} className={`flex items-center text-xs font-semibold px-2.5 py-1 rounded-full shadow-md transition-all ${isEndorsed ? 'bg-yellow-500 text-white' : 'bg-white text-gray-700 hover:bg-yellow-100'}`}><Rocket className={`w-3 h-3 mr-1 ${isEndorsed ? 'fill-white' : 'fill-gray-400'}`} />{endorsementCount}</button>
             <button onClick={(e) => { e.stopPropagation(); toggleFavorite(recipe.id, isFavorite); }} className={`p-2 rounded-full shadow-md transition-all ${isFavorite ? 'bg-[#FF654F] text-white' : 'bg-white text-gray-400 hover:text-[#FF654F] hover:bg-gray-100'}`}><Bookmark className={`w-4 h-4 ${isFavorite ? 'fill-white' : 'fill-gray-400'}`} /></button>
             
-            {/* EDIT MENU: Visible if Owner OR Admin */}
             {canModify && (<div ref={menuRef} className="relative"><button onClick={(e) => { e.stopPropagation(); setIsMenuOpen(!isMenuOpen); }} className="p-2 rounded-full bg-white text-gray-400 hover:text-gray-600 shadow-md transition-all"><MoreVertical className="w-4 h-4" /></button>{isMenuOpen && (<div className="absolute right-0 top-10 w-32 bg-white rounded-lg shadow-xl overflow-hidden z-30 border border-gray-100"><button onClick={(e) => {e.stopPropagation(); setEditingRecipe(recipe); setIsMenuOpen(false);}} className="flex items-center w-full px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 transition"><Edit className="w-4 h-4 mr-2 text-blue-500" /> Edit</button><button onClick={(e) => {e.stopPropagation(); handleDeleteRecipe(recipe.id, recipe.name); setIsMenuOpen(false);}} className="flex items-center w-full px-3 py-2 text-sm text-red-600 hover:bg-red-50 transition"><Trash2 className="w-4 h-4 mr-2" /> Delete</button></div>)}</div>)}
         </div>
 
@@ -416,7 +284,6 @@ const RecipeCard = ({ recipe, userId, isAdmin, isFavorite, toggleFavorite, toggl
           <h3 className="text-xl font-extrabold text-gray-800 leading-tight mb-1">{recipe.name}</h3>
           <div className="flex justify-between items-start">
              <p className="text-sm font-medium text-gray-500 flex items-center"><Camera className="w-3 h-3 mr-1.5 text-gray-400" />{recipe.model || 'All Models'}</p>
-             {/* MY RECIPE TAG: Only visible if you are the owner */}
              {isOwner && <span className="text-xs bg-blue-100 text-blue-600 px-2 py-0.5 rounded font-bold">My Recipe</span>}
           </div>
         </div>
@@ -424,7 +291,6 @@ const RecipeCard = ({ recipe, userId, isAdmin, isFavorite, toggleFavorite, toggl
           {settingsWithValues.slice(0, 6).map((param) => (<div key={param.key} className="flex flex-col"><span className="font-semibold text-gray-500 text-[10px] uppercase tracking-wider">{getLabelForBrand(param.key, recipe.brand)}</span><span className="text-[#FF654F] font-medium font-mono truncate" title={recipe[param.key]}>{recipe[param.key]}</span></div>))}
           {settingsWithValues.length > 6 && (<div className="col-span-2 text-center pt-2"><span className="text-xs text-gray-400 italic">+{settingsWithValues.length - 6} more settings</span></div>)}
         </div>
-        {/* NOTES HIDDEN */}
       </div>
     </div>
   );
@@ -443,24 +309,10 @@ const RecipeForm = ({ recipeData, isVisible, onClose, onSubmit, onInputChange, o
                 </div>
                 <form onSubmit={onSubmit} className="p-6 max-h-[80vh] overflow-y-auto">
                     <div className="mb-8">
-                        {/* KEY FIX: The file input is now OUTSIDE the conditional rendering. It always exists, just hidden or absolute. */}
                         <div className={`border-2 border-dashed rounded-xl flex flex-col items-center justify-center relative overflow-hidden h-48 bg-gray-50 ${recipeData.imageUrl ? 'border-[#FF654F]' : 'border-gray-300 hover:border-[#FF654F]'}`}>
-                            
-                            {/* 1. The Invisible Touch Target (Always on top) */}
                             {!isProcessingImage && !recipeData.imageUrl && (
-                                <input 
-                                    type="file" 
-                                    ref={fileInputRef} 
-                                    accept="image/*" 
-                                    onChange={(e) => {
-                                        onImageUpload(e, fileInputRef);
-                                        // We clear value inside handleImageUpload, but doubling up here helps specific browser quirks
-                                    }} 
-                                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" 
-                                />
+                                <input type="file" ref={fileInputRef} accept="image/*" onChange={(e) => { onImageUpload(e, fileInputRef); }} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" />
                             )}
-
-                            {/* 2. The Visuals (Behind the input) */}
                             {isProcessingImage ? (
                                 <div className="text-[#FF654F] flex flex-col items-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#FF654F] mb-2"></div><span className="text-xs font-medium">Compressing...</span></div>
                             ) : recipeData.imageUrl ? (
@@ -492,10 +344,7 @@ const RecipeForm = ({ recipeData, isVisible, onClose, onSubmit, onInputChange, o
                                   <div key={param.key}>
                                     <label className="block text-xs font-medium text-gray-600 mb-1">{getLabelForBrand(param.key, recipeData.brand)}</label>
                                     {options ? (
-                                      <select name={param.key} value={recipeData[param.key]} onChange={onInputChange} className="w-full text-sm border-gray-300 rounded-md focus:ring-[#FF654F] focus:border-[#FF654F]">
-                                        <option value="">Select...</option>
-                                        {options.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                                      </select>
+                                      <select name={param.key} value={recipeData[param.key]} onChange={onInputChange} className="w-full text-sm border-gray-300 rounded-md focus:ring-[#FF654F] focus:border-[#FF654F]}"><option value="">Select...</option>{options.map(opt => <option key={opt} value={opt}>{opt}</option>)}</select>
                                     ) : (
                                       <input type="text" name={param.key} value={recipeData[param.key]} onChange={onInputChange} className="w-full text-sm border-gray-300 rounded-md focus:ring-[#FF654F] focus:border-[#FF654F]" placeholder="Value..." />
                                     )}
@@ -504,7 +353,6 @@ const RecipeForm = ({ recipeData, isVisible, onClose, onSubmit, onInputChange, o
                             })}
                         </div>
                     </div>
-                    {/* NOTES HIDDEN */}
                     <button type="submit" className="w-full py-4 bg-[#FF654F] hover:bg-red-500 text-white rounded-xl font-bold shadow-lg transform transition hover:-translate-y-0.5 flex justify-center items-center">{isEditing ? <Edit className="w-5 h-5 mr-2" /> : <PlusCircle className="w-5 h-5 mr-2" />}{isEditing ? 'Update Recipe' : 'Publish Recipe'}</button>
                 </form>
             </div>
@@ -515,7 +363,6 @@ const RecipeForm = ({ recipeData, isVisible, onClose, onSubmit, onInputChange, o
 const DebugScreen = ({ isVisible, onClose, handleDeleteAllRecipes, userId }) => {
     const [accessCode, setAccessCode] = useState('');
     const [hasError, setHasError] = useState(false);
-    
     if (!isVisible) return null;
 
     const handleNuclearLaunch = () => {
@@ -526,7 +373,7 @@ const DebugScreen = ({ isVisible, onClose, handleDeleteAllRecipes, userId }) => 
             onClose();
         } else {
             setHasError(true);
-            setTimeout(() => setHasError(false), 500); // Reset shake animation
+            setTimeout(() => setHasError(false), 500);
         }
     };
 
@@ -538,21 +385,8 @@ const DebugScreen = ({ isVisible, onClose, handleDeleteAllRecipes, userId }) => 
                     <div className="lg:col-span-1 border-r lg:pr-8">
                         <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center"><AlertTriangle className="w-5 h-5 mr-2 text-red-500" />Danger Zone</h3>
                         <div className='mb-4 p-3 bg-gray-100 rounded-lg'><p className='text-xs font-semibold text-gray-700 mb-1'>User ID:</p><p className='text-xs font-mono break-all text-gray-800'>{userId || 'Authenticating...'}</p></div>
-                        
-                        <div className="mb-3">
-                            <label className="block text-xs font-bold text-red-600 mb-1">Nuclear Code Required</label>
-                            <input 
-                                type="password" 
-                                value={accessCode} 
-                                onChange={(e) => setAccessCode(e.target.value)} 
-                                className={`w-full border rounded-lg text-sm p-2 transition-all ${hasError ? 'border-red-500 ring-2 ring-red-500 animate-pulse' : 'border-red-300 focus:ring-red-500'}`} 
-                                placeholder='Enter "fromorbit" to confirm' 
-                            />
-                        </div>
-
-                        <button onClick={handleNuclearLaunch} className="flex items-center w-full justify-center px-4 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg font-bold shadow-md transition">
-                            <Flame className="w-5 h-5 mr-2" /> Reset All Data
-                        </button>
+                        <div className="mb-3"><label className="block text-xs font-bold text-red-600 mb-1">Nuclear Code Required</label><input type="password" value={accessCode} onChange={(e) => setAccessCode(e.target.value)} className={`w-full border rounded-lg text-sm p-2 transition-all ${hasError ? 'border-red-500 ring-2 ring-red-500 animate-pulse' : 'border-red-300 focus:ring-red-500'}`} placeholder='Enter "fromorbit" to confirm' /></div>
+                        <button onClick={handleNuclearLaunch} className="flex items-center w-full justify-center px-4 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg font-bold shadow-md transition"><Flame className="w-5 h-5 mr-2" /> Reset All Data</button>
                     </div>
                 </div>
             </div>
@@ -573,12 +407,10 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [isAuthReady, setIsAuthReady] = useState(false);
-  
   const [isFormVisible, setIsFormVisible] = useState(false);
   const [isDebugMenuOpen, setIsDebugMenuOpen] = useState(false);
   const [isAboutOpen, setIsAboutOpen] = useState(false); 
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
-
   const [newRecipe, setNewRecipe] = useState(initialFormState);
   const [editingRecipe, setEditingRecipe] = useState(null);
   const [selectedRecipe, setSelectedRecipe] = useState(null);
@@ -589,46 +421,31 @@ function App() {
 
   const showCustomError = (message) => { setError(message); setTimeout(() => setError(null), 5000); };
 
-  // --- AUTHENTICATION ---
   useEffect(() => {
     try {
       const app = initializeApp(firebaseConfig);
       const firestoreDb = getFirestore(app);
       const firebaseAuth = getAuth(app);
       setDb(firestoreDb); setAuth(firebaseAuth);
-      
       onAuthStateChanged(firebaseAuth, async (user) => {
         if (user) {
           setUserId(user.uid);
-          // Check if Anon or Real
           if (!user.isAnonymous) {
-              // CHECK IF ADMIN
               const email = user.email;
               const isAdmin = ADMIN_EMAILS.includes(email);
-              setUserProfile({ 
-                  name: user.displayName || user.email, 
-                  photo: user.photoURL,
-                  email: email,
-                  isAdmin: isAdmin 
-              });
-          } else {
-              setUserProfile(null); // Guest
-          }
+              setUserProfile({ name: user.displayName || user.email, photo: user.photoURL, email: email, isAdmin: isAdmin });
+          } else { setUserProfile(null); }
         } else {
            try { const cred = await signInAnonymously(firebaseAuth); setUserId(cred.user.uid); setUserProfile(null); } 
            catch (e) { setError("Auth Failed"); }
         }
         setLoading(false); setIsAuthReady(true);
       });
-    } catch (e) { console.error(e); setError("Initialization failed. Check Keys."); setLoading(false); setIsAuthReady(true); }
+    } catch (e) { console.error(e); setError("Initialization failed."); setLoading(false); setIsAuthReady(true); }
   }, []);
 
-  const handleSignOut = async () => {
-      if (!auth) return;
-      try { await signOut(auth); window.location.reload(); } catch (error) { console.error(error); }
-  };
+  const handleSignOut = async () => { if (!auth) return; try { await signOut(auth); window.location.reload(); } catch (error) { console.error(error); } };
 
-  // --- DATA FETCHING ---
   useEffect(() => {
     if (!db || !isAuthReady) return;
     const unsubscribe = onSnapshot(query(collection(db, RECIPES_COLLECTION_PATH)), (snapshot) => {
@@ -645,23 +462,16 @@ function App() {
     return () => unsubscribe();
   }, [db, isAuthReady, userId]);
   
-  // --- BUG FIX: Open form when editing recipe is selected ---
-  useEffect(() => {
-    if (editingRecipe) {
-      setIsFormVisible(true);
-      setSelectedRecipe(null); // Close detail modal if open
-    }
-  }, [editingRecipe]);
+  useEffect(() => { if (editingRecipe) { setIsFormVisible(true); setSelectedRecipe(null); } }, [editingRecipe]);
 
-  // --- ACTIONS ---
   const toggleFavorite = async (recipeId, isFavorite) => {
-    if (!userProfile) { setIsAuthModalOpen(true); return; } // FORCE LOGIN
+    if (!userProfile) { setIsAuthModalOpen(true); return; }
     const ref = doc(db, `users/${userId}/favorites`, recipeId);
     isFavorite ? await deleteDoc(ref) : await setDoc(ref, { favoritedAt: serverTimestamp(), recipeId });
   };
 
   const toggleEndorsement = async (recipeId, isEndorsed) => {
-    if (!userProfile) { setIsAuthModalOpen(true); return; } // FORCE LOGIN
+    if (!userProfile) { setIsAuthModalOpen(true); return; }
     const ref = doc(db, RECIPES_COLLECTION_PATH, recipeId);
     await updateDoc(ref, { endorserIds: isEndorsed ? arrayRemove(userId) : arrayUnion(userId) });
   };
@@ -670,22 +480,14 @@ function App() {
     if (!db || !userId) return showCustomError("Auth required.");
     if (window.confirm(`Delete "${recipeName}"?`)) {
         const recipe = recipes.find(r => r.id === recipeId);
-        
-        // Check if Admin OR Owner
         const isAdmin = userProfile && userProfile.isAdmin;
         const isOwner = recipe?.userId === userId;
-
         if (!isOwner && !isAdmin) return showCustomError("Not your recipe.");
-        
         await deleteDoc(doc(db, RECIPES_COLLECTION_PATH, recipeId));
     }
   };
   
-  // --- NEW: Handler to open form when clicking Edit
-  const handleEditClick = (recipe) => {
-      setEditingRecipe(recipe);
-      // Note: The useEffect above watches 'editingRecipe' and will open the form automatically
-  };
+  const handleEditClick = (recipe) => { setEditingRecipe(recipe); };
 
   const handleDeleteAllRecipes = async () => {
     const snap = await getDocs(collection(db, RECIPES_COLLECTION_PATH));
@@ -703,28 +505,11 @@ function App() {
     return list.sort((a, b) => (b.endorserIds?.length || 0) - (a.endorserIds?.length || 0));
   }, [recipes, filterBrand, searchTerm, favoriteRecipeIds]);
 
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    (editingRecipe ? setEditingRecipe : setNewRecipe)(prev => ({ ...prev, [name]: value }));
-  };
+  const handleInputChange = (e) => { const { name, value } = e.target; (editingRecipe ? setEditingRecipe : setNewRecipe)(prev => ({ ...prev, [name]: value })); };
 
   const handleBrandChange = (e) => {
     const val = e.target.value;
-    const setter = editingRecipe ? setEditingRecipe : setNewRecipe;
-    
-    setter(prev => {
-        const newModel = BRAND_MODELS[val]?.[0] || '';
-        const newBaseProfile = BASE_PROFILES_BY_BRAND[val]?.[0] || '';
-        const blankSettings = CORE_PARAMS_MAP.reduce((acc, param) => ({ ...acc, [param.key]: '' }), {});
-        
-        return { 
-            ...prev, 
-            brand: val, 
-            model: newModel, 
-            baseProfile: newBaseProfile, 
-            ...blankSettings 
-        };
-    });
+    (editingRecipe ? setEditingRecipe : setNewRecipe)(prev => ({ ...prev, brand: val, model: BRAND_MODELS[val]?.[0] || '', baseProfile: BASE_PROFILES_BY_BRAND[val]?.[0] || '', ...CORE_PARAMS_MAP.reduce((acc, param) => ({ ...acc, [param.key]: '' }), {}) }));
   };
   
   const handleImageUpload = async (e, inputRef) => {
@@ -766,46 +551,17 @@ function App() {
             <div className="flex items-center"><div className="bg-[#FF654F] p-2 rounded-lg mr-3"><Aperture className="w-5 h-5 text-white" /></div><h1 className="text-2xl font-black tracking-tight text-gray-900">{SITE_TITLE}</h1></div>
             <div className="flex space-x-3 items-center">
                <button onClick={() => setIsAboutOpen(true)} className="px-3 py-1 text-xs font-medium text-gray-500 bg-gray-100 hover:bg-gray-200 rounded-full transition" title="About">About</button>
-               
-               {/* AUTH BUTTONS */}
                {userProfile ? (
                    <div className="flex items-center space-x-2">
-                       {userProfile.photo ? (
-                           <img src={userProfile.photo} alt="User" className="w-8 h-8 rounded-full border border-gray-200" />
-                       ) : (
-                           <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-white font-bold text-xs">{userProfile.name?.[0]}</div>
-                       )}
-                       
-                       {/* ADMIN BADGE */}
+                       {userProfile.photo ? <img src={userProfile.photo} alt="User" className="w-8 h-8 rounded-full border border-gray-200" /> : <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-white font-bold text-xs">{userProfile.name?.[0]}</div>}
                        {userProfile.isAdmin && <div title="Admin Access" className="bg-red-100 text-red-600 p-1 rounded-full"><Shield className="w-4 h-4" /></div>}
-
                        <button onClick={handleSignOut} className="p-2 rounded-full text-red-500 hover:bg-red-50 transition" title="Sign Out"><LogOut className="w-5 h-5" /></button>
                    </div>
                ) : (
-                   <button onClick={() => setIsAuthModalOpen(true)} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-full transition flex items-center">
-                       <User className="w-3 h-3 mr-2" /> Sign In
-                   </button>
+                   <button onClick={() => setIsAuthModalOpen(true)} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-full transition flex items-center"><User className="w-3 h-3 mr-2" /> Sign In</button>
                )}
-               
-               {/* ADMIN ONLY: Debug Menu is now strictly for Admins */}
-               {userProfile && userProfile.isAdmin && (
-                   <button onClick={() => setIsDebugMenuOpen(true)} className="p-2 rounded-full text-gray-700 hover:bg-gray-100 transition"><Settings className="w-5 h-5" /></button>
-               )}
-               
-               {/* NEW RECIPE: Visible to all, but triggers login for guests */}
-               <button 
-                  onClick={() => {
-                    if (userProfile) {
-                        setEditingRecipe(null); 
-                        setIsFormVisible(true);
-                    } else {
-                        setIsAuthModalOpen(true);
-                    }
-                  }}
-                  className="bg-gray-900 text-white px-4 py-2 rounded-full text-sm font-semibold hover:bg-gray-800 transition flex items-center shadow-md"
-               >
-                 <PlusCircle className="w-4 h-4 mr-2" />New Recipe
-               </button>
+               {userProfile && userProfile.isAdmin && <button onClick={() => setIsDebugMenuOpen(true)} className="p-2 rounded-full text-gray-700 hover:bg-gray-100 transition"><Settings className="w-5 h-5" /></button>}
+               <button onClick={() => { if (userProfile) { setEditingRecipe(null); setIsFormVisible(true); } else { setIsAuthModalOpen(true); } }} className="bg-gray-900 text-white px-4 py-2 rounded-full text-sm font-semibold hover:bg-gray-800 transition flex items-center shadow-md"><PlusCircle className="w-4 h-4 mr-2" />New Recipe</button>
             </div>
           </div>
         </header>
